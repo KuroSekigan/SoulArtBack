@@ -17,7 +17,8 @@ RUN mkdir -p /root/.ssh && \
 # Clona tu repositorio privado de Express
 RUN git clone git@github.com:KuroSekigan/SoulArtBack.git /app \
     && git config --global --add safe.directory /app \
-    && cd /app && git checkout main && git pull
+    && cd /app && git checkout Kuro \
+    && git pull
 
 # Instala dependencias
 RUN cd /app && npm install
