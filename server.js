@@ -2,7 +2,7 @@
 import express from 'express';
 import mysql from 'mysql2';
 import cors from 'cors';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 // Inicialización
 const app = express();
