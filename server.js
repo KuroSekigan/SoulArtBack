@@ -9,6 +9,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+/*
+
 // Conexión a la base de datos
 const db = mysql.createConnection({
     host: '127.0.0.1', // Hostname
@@ -224,6 +226,8 @@ app.delete('/usuarios/:id', (req, res) => {
         }
     });
 });
+
+*/
 
 // Configuración del puerto
 const PORT = 3001;
