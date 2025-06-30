@@ -1,18 +1,25 @@
 {
-  "name": "server",
+  "name": "soulartback",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KuroSekigan/SoulArtBack.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "bugs": {
+    "url": "https://github.com/KuroSekigan/SoulArtBack/issues"
+  },
+  "homepage": "https://github.com/KuroSekigan/SoulArtBack#readme",
   "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "mysql2": "^3.12.0"
+    "express": "^5.1.0"
   }
 }

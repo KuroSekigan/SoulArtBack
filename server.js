@@ -1,8 +1,8 @@
 // Importaciones
 import express from 'express';
-import mysql from 'mysql2';
+/* import mysql from 'mysql2';
 import cors from 'cors';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs'; */
 
 // Inicialización
 const app = express();
