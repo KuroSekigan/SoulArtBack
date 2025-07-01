@@ -230,7 +230,7 @@ app.delete('/usuarios/:id', (req, res) => {
 */
 
 // Configuración del puerto
-const PORT = 3001;
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
