@@ -20,6 +20,9 @@
   },
   "homepage": "https://github.com/KuroSekigan/SoulArtBack#readme",
   "dependencies": {
-    "express": "^5.1.0"
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.1"
   }
 }
