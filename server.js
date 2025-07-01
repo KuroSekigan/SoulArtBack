@@ -236,5 +236,5 @@ app.listen(PORT, () => {
 });
 
 app.get('/', (req, res) => {
-  res.send('¡Servidor funcionando correctamente!');
+  res.json({ message: 'API backend funcionando' });
 });
