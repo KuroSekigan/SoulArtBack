@@ -1,22 +1,21 @@
 // Importaciones
 import express from 'express';
 import cors from 'cors';
-/* import mysql from 'mysql2';
-import bcrypt from 'bcryptjs'; */
+import mysql from 'mysql2';
+import bcrypt from 'bcryptjs';
 
 // Inicialización
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-/*
 
 // Conexión a la base de datos
 const db = mysql.createConnection({
-    host: '127.0.0.1', // Hostname
+    host: '127.crossover.proxy.rlwy.net', // Hostname
     user: 'root',      // Usuario de MySQL
-    password: '12312312',      // Contraseña de MySQL
-    database: 'aplicacion_db' // Nombre de la base de datos
+    password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',      // Contraseña de MySQL
+    database: 'railway' // Nombre de la base de datos
 });
 
 // Verificar la conexión
@@ -28,53 +27,91 @@ db.connect((err) => {
     console.log('¡Conectado a la base de datos!');
 });
 
+// Ruta para registrar usuario
+app.post('/registro', async (req, res) => {
+    const { correo, nombre_usuario, contraseña } = req.body;
+
+    if (!correo || !nombre_usuario || !contraseña) {
+        return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
+
+    try {
+        // Verificar si el correo o nombre de usuario ya existen
+        const existeQuery = 'SELECT * FROM usuarios WHERE correo = ? OR nombre_usuario = ?';
+        db.query(existeQuery, [correo, nombre_usuario], async (err, results) => {
+            if (err) {
+                console.error('Error en la consulta:', err);
+                return res.status(500).json({ error: 'Error en el servidor' });
+            }
+
+            if (results.length > 0) {
+                return res.json({ success: false, message: 'El correo o nombre de usuario ya están registrados' });
+            }
+
+            // Encriptar la contraseña
+            const hash = await bcrypt.hash(contraseña, 10);
+
+            // Insertar usuario con estado_id como NULL
+            const insertQuery = `
+                INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id)
+                VALUES (?, ?, ?, NULL)
+            `;
+            db.query(insertQuery, [correo, nombre_usuario, hash], (err, result) => {
+                if (err) {
+                    console.error('Error al registrar:', err);
+                    return res.status(500).json({ error: 'Error al registrar el usuario' });
+                }
+
+                res.json({ success: true, message: 'Usuario registrado correctamente' });
+            });
+        });
+    } catch (error) {
+        console.error('Error general:', error);
+        res.status(500).json({ error: 'Error interno' });
+    }
+});
+
 // Ruta para verificar el login
 app.post('/login', (req, res) => {
-    const { username, password } = req.body;
+    const { correo, contraseña } = req.body;
 
-    // Consulta para obtener el usuario con el username proporcionado
-    const query = 'SELECT * FROM usuarios WHERE username = ?';
-    db.query(query, [username], async (err, results) => {
+    if (!correo || !contraseña) {
+        return res.status(400).json({ error: 'Correo y contraseña requeridos' });
+    }
+
+    const query = 'SELECT * FROM usuarios WHERE correo = ?';
+    db.query(query, [correo], async (err, results) => {
         if (err) {
             console.error('Error en la consulta:', err);
-            res.status(500).json({ error: 'Error en el servidor' });
-            return;
+            return res.status(500).json({ error: 'Error en el servidor' });
         }
 
-        if (results.length > 0) {
-            // El usuario existe, ahora comparamos la contraseña ingresada con la almacenada
-            const user = results[0];  // Tomamos el primer usuario encontrado
-            try {
-                const passwordMatch = await bcrypt.compare(password, user.password);
+        if (results.length === 0) {
+            return res.json({ success: false, message: 'Correo o contraseña incorrectos' });
+        }
 
-                if (passwordMatch) {
-                    res.json({ success: true, message: '¡Login exitoso!' });
-                } else {
-                    res.json({ success: false, message: 'Usuario o contraseña incorrectos' });
-                }
-            } catch (error) {
-                console.error('Error al comparar contraseñas:', error);
-                res.status(500).json({ error: 'Error al verificar la contraseña' });
+        const usuario = results[0];
+
+        // (Opcional) Verificar si el usuario está baneado usando estado_id
+        if (usuario.estado_id !== null) {
+            return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
+        }
+
+        try {
+            const coincide = await bcrypt.compare(contraseña, usuario.contraseña);
+            if (coincide) {
+                res.json({ success: true, message: '¡Login exitoso!' });
+            } else {
+                res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
-        } else {
-            // Si no existe el usuario
-            res.json({ success: false, message: 'Usuario o contraseña incorrectos' });
+        } catch (error) {
+            console.error('Error al verificar contraseña:', error);
+            res.status(500).json({ error: 'Error interno' });
         }
     });
 });
 
-// Obtener todos los productos
-app.get('/productos', (req, res) => {
-    const query = 'SELECT * FROM productos';
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error al obtener los productos:', err);
-            res.status(500).json({ error: 'Error al obtener los productos' });
-        } else {
-            res.json(results);
-        }
-    });
-});
+/*
 
 // Crear un producto
 app.post('/productos', (req, res) => {
