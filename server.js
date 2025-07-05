@@ -12,7 +12,7 @@ app.use(express.json());
 
 // Conexión a la base de datos
 const db = mysql.createConnection({
-    host: '127.crossover.proxy.rlwy.net', // Hostname
+    host: 'crossover.proxy.rlwy.net', // Hostname
     user: 'root',      // Usuario de MySQL
     password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',      // Contraseña de MySQL
     database: 'railway' // Nombre de la base de datos
