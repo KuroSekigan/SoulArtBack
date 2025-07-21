@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import streamifier from 'streamifier';
 
 // Inicialización
 const app = express();
@@ -14,13 +15,12 @@ app.use(express.json());
 
 // Conexión a la base de datos
 const db = mysql.createConnection({
-    host: 'mysql.railway.internal', // Hostname
-    user: 'root',      // Usuario de MySQL
-    password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',      // Contraseña de MySQL
-    database: 'railway' // Nombre de la base de datos
+    host: 'mysql.railway.internal',
+    user: 'root',
+    password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',
+    database: 'railway'
 });
 
-// Verificar la conexión
 db.connect((err) => {
     if (err) {
         console.error('Error de conexión a la base de datos:', err);
@@ -29,26 +29,22 @@ db.connect((err) => {
     console.log('¡Conectado a la base de datos!');
 });
 
+// Configurar Cloudinary
 cloudinary.config({
-  cloud_name: "dtz7wzh0c",
-  api_key: "453682627338357",
-  api_secret: "5LQaP8AJeroRFpqk5MjgQ-Kjw1k",
+    cloud_name: "dtz7wzh0c",
+    api_key: "453682627338357",
+    api_secret: "5LQaP8AJeroRFpqk5MjgQ-Kjw1k",
 });
 
-module.exports = cloudinary;
-
+// Configurar almacenamiento en Cloudinary con multer
 const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "usuarios", // Carpeta en Cloudinary
-    // falta la carpeta "comics" para portada_url y "paginas" para imagen_url
-    allowed_formats: ["jpg", "png", "jpeg"]
-  }
+    cloudinary,
+    params: {
+        folder: "usuarios",
+        allowed_formats: ["jpg", "png", "jpeg"]
+    }
 });
 const upload = multer({ storage });
-
-const cloudinary = require('./cloudinary'); // Ruta a tu config
-const upload = require('./upload'); // Si modularizas multer, o úsalo directamente
 
 // Ruta para registrar usuario
 app.post('/registro', upload.single('imagen'), async (req, res) => {
@@ -59,7 +55,6 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
     }
 
     try {
-        // Verificar si ya existe
         const existeQuery = 'SELECT * FROM usuarios WHERE correo = ? OR nombre_usuario = ?';
         db.query(existeQuery, [correo, nombre_usuario], async (err, results) => {
             if (err) return res.status(500).json({ error: 'Error en el servidor' });
@@ -67,26 +62,8 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            // Subir imagen a Cloudinary (si hay)
-            let imagen_url = 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.jpg'; // URL por defecto
-            if (req.file) {
-                const result = await cloudinary.uploader.upload_stream(
-                    { folder: 'usuarios' },
-                    (error, result) => {
-                        if (error) console.error(error);
-                        imagen_url = result.secure_url;
-                        insertarUsuario(imagen_url);
-                    }
-                );
+            let imagen_url = 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.jpg';
 
-                // Convertir buffer a stream para Cloudinary
-                const streamifier = require('streamifier');
-                streamifier.createReadStream(req.file.buffer).pipe(result);
-            } else {
-                insertarUsuario(imagen_url);
-            }
-
-            // Función para insertar usuario
             const insertarUsuario = async (imagen_url_final) => {
                 const hash = await bcrypt.hash(contraseña, 10);
                 const insertQuery = `
@@ -98,6 +75,22 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                     res.json({ success: true, message: 'Usuario registrado', imagen: imagen_url_final });
                 });
             };
+
+            if (req.file) {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: 'usuarios' },
+                    (error, result) => {
+                        if (error) {
+                            console.error(error);
+                            return res.status(500).json({ error: 'Error al subir imagen' });
+                        }
+                        insertarUsuario(result.secure_url);
+                    }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(stream);
+            } else {
+                insertarUsuario(imagen_url);
+            }
         });
     } catch (error) {
         console.error(error);
@@ -105,7 +98,7 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
     }
 });
 
-// Ruta para verificar el login
+// Ruta para login
 app.post('/login', (req, res) => {
     const { correo, contraseña } = req.body;
 
@@ -126,7 +119,6 @@ app.post('/login', (req, res) => {
 
         const usuario = results[0];
 
-        // (Opcional) Verificar si el usuario está baneado usando estado_id
         if (usuario.estado_id !== null) {
             return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
         }
@@ -145,12 +137,13 @@ app.post('/login', (req, res) => {
     });
 });
 
-// Configuración del puerto
+// Ruta base
+app.get('/', (req, res) => {
+    res.json({ message: 'API backend funcionando' });
+});
+
+// Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
-
-app.get('/', (req, res) => {
-  res.json({ message: 'API backend funcionando' });
 });
