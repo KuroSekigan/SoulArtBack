@@ -26,6 +26,7 @@
     "express": "^5.1.0",
     "multer": "^2.0.1",
     "multer-storage-cloudinary": "^4.0.0",
-    "mysql2": "^3.14.1"
+    "mysql2": "^3.14.1",
+    "streamifier": "^0.1.1"
   }
 }
