@@ -62,7 +62,7 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            let imagen_url = 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.jpg';
+            let imagen_url = 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
 
             const insertarUsuario = async (imagen_url_final) => {
                 const hash = await bcrypt.hash(contraseña, 10);
