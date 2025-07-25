@@ -65,17 +65,20 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            // Aquí tomamos directamente la URL generada por multer-storage-cloudinary
-            const imagen_url = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
+            // Guardar URL de la imagen
+            const foto_perfil = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
 
             const hash = await bcrypt.hash(contraseña, 10);
             const insertQuery = `
-                INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, imagen_url)
+                INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, foto_perfil)
                 VALUES (?, ?, ?, NULL, ?)
             `;
-            db.query(insertQuery, [correo, nombre_usuario, hash, imagen_url], (err, result) => {
-                if (err) return res.status(500).json({ error: 'Error al registrar' });
-                res.json({ success: true, message: 'Usuario registrado', imagen: imagen_url });
+            db.query(insertQuery, [correo, nombre_usuario, hash, foto_perfil], (err, result) => {
+                if (err) {
+                    console.error('Error al insertar en la base de datos:', err);
+                    return res.status(500).json({ error: 'Error al registrar' });
+                }
+                res.json({ success: true, message: 'Usuario registrado', imagen: foto_perfil });
             });
         });
     } catch (error) {
