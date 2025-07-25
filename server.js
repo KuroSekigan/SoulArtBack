@@ -71,9 +71,9 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
             const hash = await bcrypt.hash(contraseña, 10);
             const insertQuery = `
                 INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, foto_perfil)
-                VALUES (?, ?, ?, NULL, ?)
+                VALUES (?, ?, ?, ?, ?)
             `;
-            db.query(insertQuery, [correo, nombre_usuario, hash, foto_perfil], (err, result) => {
+            db.query(insertQuery, [correo, nombre_usuario, hash, 1, foto_perfil], (err, result) => {
                 if (err) {
                     console.error('Error al insertar en la base de datos:', err);
                     return res.status(500).json({ error: 'Error al registrar' });
