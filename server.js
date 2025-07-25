@@ -48,6 +48,9 @@ const upload = multer({ storage });
 
 // Ruta para registrar usuario
 app.post('/registro', upload.single('imagen'), async (req, res) => {
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file);
+
     const { correo, nombre_usuario, contraseña } = req.body;
 
     if (!correo || !nombre_usuario || !contraseña) {
