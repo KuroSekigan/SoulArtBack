@@ -62,35 +62,18 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            let imagen_url = 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
+            // Aquí tomamos directamente la URL generada por multer-storage-cloudinary
+            const imagen_url = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
 
-            const insertarUsuario = async (imagen_url_final) => {
-                const hash = await bcrypt.hash(contraseña, 10);
-                const insertQuery = `
-                    INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, imagen_url)
-                    VALUES (?, ?, ?, NULL, ?)
-                `;
-                db.query(insertQuery, [correo, nombre_usuario, hash, imagen_url_final], (err, result) => {
-                    if (err) return res.status(500).json({ error: 'Error al registrar' });
-                    res.json({ success: true, message: 'Usuario registrado', imagen: imagen_url_final });
-                });
-            };
-
-            if (req.file) {
-                const stream = cloudinary.uploader.upload_stream(
-                    { folder: 'usuarios' },
-                    (error, result) => {
-                        if (error) {
-                            console.error(error);
-                            return res.status(500).json({ error: 'Error al subir imagen' });
-                        }
-                        insertarUsuario(result.secure_url);
-                    }
-                );
-                streamifier.createReadStream(req.file.buffer).pipe(stream);
-            } else {
-                insertarUsuario(imagen_url);
-            }
+            const hash = await bcrypt.hash(contraseña, 10);
+            const insertQuery = `
+                INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, imagen_url)
+                VALUES (?, ?, ?, NULL, ?)
+            `;
+            db.query(insertQuery, [correo, nombre_usuario, hash, imagen_url], (err, result) => {
+                if (err) return res.status(500).json({ error: 'Error al registrar' });
+                res.json({ success: true, message: 'Usuario registrado', imagen: imagen_url });
+            });
         });
     } catch (error) {
         console.error(error);
