@@ -152,6 +152,72 @@ app.post('/login', (req, res) => {
     });
 });
 
+app.get('/usuario/:id/perfil', (req, res) => {
+    const userId = req.params.id;
+
+    const sql = `
+        SELECT nombre_usuario, correo, foto_perfil, biografia, twitter_url, facebook_url, instagram_url 
+        FROM usuarios 
+        WHERE id = ?
+    `;
+
+    db.query(sql, [userId], (err, results) => {
+        if (err) {
+            console.error('Error al obtener perfil:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        res.json(results[0]);
+    });
+});
+
+app.get('/favoritos/:usuario_id', (req, res) => {
+    const usuario_id = req.params.usuario_id;
+
+    const sql = `
+        SELECT c.id, c.titulo, c.portada_url
+        FROM favoritos_comics f 
+        JOIN comics c ON f.comic_id = c.id 
+        WHERE f.usuario_id = ?
+    `;
+
+    db.query(sql, [usuario_id], (err, results) => {
+        if (err) {
+            console.error('Error al obtener favoritos:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+        res.json(results);
+    });
+});
+
+app.post('/favoritos', (req, res) => {
+    const { usuario_id, comic_id } = req.body;
+
+    const sql = `INSERT IGNORE INTO favoritos_comics (usuario_id, comic_id) VALUES (?, ?)`;
+    db.query(sql, [usuario_id, comic_id], (err, result) => {
+        if (err) {
+            console.error('Error al seguir cómic:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+        res.json({ success: true, message: 'Comic seguido correctamente' });
+    });
+});
+
+app.delete('/favoritos', (req, res) => {
+    const { usuario_id, comic_id } = req.body;
+
+    const sql = `DELETE FROM favoritos_comics WHERE usuario_id = ? AND comic_id = ?`;
+    db.query(sql, [usuario_id, comic_id], (err, result) => {
+        if (err) {
+            console.error('Error al dejar de seguir cómic:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+        res.json({ success: true, message: 'Comic eliminado de favoritos' });
+    });
+});
+
 // Ruta base
 app.get('/', (req, res) => {
     res.json({ message: 'API backend funcionando' });
