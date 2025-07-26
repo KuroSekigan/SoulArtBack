@@ -11,6 +11,9 @@ import streamifier from 'streamifier';
 // Inicialización
 const app = express();
 app.use(cors());
+
+// Estos deben ir antes que multer
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Conexión a la base de datos
@@ -52,7 +55,9 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
         console.log('📥 req.body:', req.body);
         console.log('📸 req.file:', req.file);
 
-        const { correo, nombre_usuario, contraseña } = req.body;
+        const correo = req.body.correo;
+        const nombre_usuario = req.body.nombre_usuario;
+        const contraseña = req.body.contraseña || req.body["contraseÃ±a"]; // Parche temporal
 
         if (!correo || !nombre_usuario || !contraseña) {
             return res.status(400).json({ error: 'Faltan datos obligatorios' });
@@ -70,9 +75,7 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            // Imagen por defecto si no se subió
             const foto_perfil = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
-
             const hash = await bcrypt.hash(contraseña, 10);
 
             const insertQuery = `
