@@ -122,7 +122,7 @@ app.post('/login', (req, res) => {
 
         const usuario = results[0];
 
-        if (usuario.estado_id !== 2) {
+        if (usuario.estado_id === 2) {
             return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
         }
 
