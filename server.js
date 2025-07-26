@@ -122,7 +122,7 @@ app.post('/login', (req, res) => {
 
         const usuario = results[0];
 
-        if (usuario.estado_id !== null) {
+        if (usuario.estado_id !== 2) {
             return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
         }
 
@@ -143,7 +143,7 @@ app.post('/login', (req, res) => {
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
-            
+
         } catch (error) {
             console.error('Error al verificar contraseña:', error);
             res.status(500).json({ error: 'Error interno' });
