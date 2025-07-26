@@ -7,9 +7,11 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import streamifier from 'streamifier';
+import jwt from 'jsonwebtoken';
 
 // Inicialización
 const app = express();
+const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
 
 // Estos deben ir antes que multer
@@ -127,10 +129,21 @@ app.post('/login', (req, res) => {
         try {
             const coincide = await bcrypt.compare(contraseña, usuario.contraseña);
             if (coincide) {
-                res.json({ success: true, message: '¡Login exitoso!' });
+                const token = jwt.sign(
+                    {
+                        id: usuario.id,
+                        correo: usuario.correo,
+                        nombre_usuario: usuario.nombre_usuario
+                    },
+                    JWT_SECRET,
+                    { expiresIn: '2h' } // el token durará 2 horas
+                );
+            
+                res.json({ success: true, message: '¡Login exitoso!', token });
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
+            
         } catch (error) {
             console.error('Error al verificar contraseña:', error);
             res.status(500).json({ error: 'Error interno' });
