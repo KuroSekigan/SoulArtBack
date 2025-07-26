@@ -75,7 +75,7 @@ app.post('/registro', upload.single('imagen'), async (req, res) => {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            const foto_perfil = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
+            const foto_perfil = req.file?.path || 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753396083/default_profile_htx1ge.png';
             const hash = await bcrypt.hash(contraseña, 10);
 
             const insertQuery = `
