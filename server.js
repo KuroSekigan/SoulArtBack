@@ -133,13 +133,14 @@ app.post('/login', (req, res) => {
                     {
                         id: usuario.id,
                         correo: usuario.correo,
-                        nombre_usuario: usuario.nombre_usuario
+                        nombre_usuario: usuario.nombre_usuario,
+                        foto_perfil: usuario.foto_perfil
                     },
                     JWT_SECRET,
                     { expiresIn: '2h' } // el token durará 2 horas
                 );
             
-                res.json({ success: true, message: '¡Login exitoso!', token });
+                res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
