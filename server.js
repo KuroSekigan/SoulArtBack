@@ -48,41 +48,50 @@ const upload = multer({ storage });
 
 // Ruta para registrar usuario
 app.post('/registro', upload.single('imagen'), async (req, res) => {
-    console.log('req.body:', req.body);
-    console.log('req.file:', req.file);
-
-    const { correo, nombre_usuario, contraseña } = req.body;
-
-    if (!correo || !nombre_usuario || !contraseña) {
-        return res.status(400).json({ error: 'Faltan datos obligatorios' });
-    }
-
     try {
+        console.log('📥 req.body:', req.body);
+        console.log('📸 req.file:', req.file);
+
+        const { correo, nombre_usuario, contraseña } = req.body;
+
+        if (!correo || !nombre_usuario || !contraseña) {
+            return res.status(400).json({ error: 'Faltan datos obligatorios' });
+        }
+
         const existeQuery = 'SELECT * FROM usuarios WHERE correo = ? OR nombre_usuario = ?';
+
         db.query(existeQuery, [correo, nombre_usuario], async (err, results) => {
-            if (err) return res.status(500).json({ error: 'Error en el servidor' });
+            if (err) {
+                console.error('❌ Error al verificar usuario existente:', err);
+                return res.status(500).json({ error: 'Error en el servidor' });
+            }
+
             if (results.length > 0) {
                 return res.json({ success: false, message: 'Ya registrado' });
             }
 
-            // Guardar URL de la imagen
+            // Imagen por defecto si no se subió
             const foto_perfil = req.file?.path || 'https://res.cloudinary.com/demo/image/upload/v1234567890/default_profile.png';
 
             const hash = await bcrypt.hash(contraseña, 10);
+
             const insertQuery = `
                 INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, foto_perfil)
                 VALUES (?, ?, ?, ?, ?)
             `;
+
             db.query(insertQuery, [correo, nombre_usuario, hash, 1, foto_perfil], (err, result) => {
                 if (err) {
-                    console.error('Error al insertar en la base de datos:', err);
+                    console.error('❌ Error al insertar en la base de datos:', err);
                     return res.status(500).json({ error: 'Error al registrar' });
                 }
-                res.json({ success: true, message: 'Usuario registrado', imagen: foto_perfil });
+
+                console.log('✅ Usuario registrado en la base de datos');
+                return res.json({ success: true, message: 'Usuario registrado', imagen: foto_perfil });
             });
         });
     } catch (error) {
-        console.error(error);
+        console.error('❌ Error inesperado:', error);
         res.status(500).json({ error: 'Error interno' });
     }
 });
