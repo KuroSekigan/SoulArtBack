@@ -217,14 +217,30 @@ app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
             console.error('❌ Error al actualizar usuario:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
         }
-    
+
         // Respondemos con los campos actualizados
         const responseData = { success: true, message: 'Perfil actualizado correctamente' };
         if (nuevaFotoPerfil) {
             responseData.foto_perfil = nuevaFotoPerfil;
         }
-    
+
         res.json(responseData);
+    });
+});
+
+// Obtener todos los cómics subidos por un usuario
+app.get('/usuario/:id/comics', (req, res) => {
+    const usuarioId = req.params.id;
+
+    const sql = 'SELECT * FROM comics WHERE autor_id = ? ORDER BY fecha_creacion DESC'; // Ajusta columnas si necesitas
+
+    db.query(sql, [usuarioId], (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics del usuario:', err);
+            return res.status(500).json({ error: 'Error al obtener cómics del usuario' });
+        }
+
+        res.json(results);
     });
 });
 
