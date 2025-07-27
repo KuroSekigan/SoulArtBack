@@ -238,6 +238,18 @@ app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
     });
 });
 
+function verificarToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
+
+    jwt.verify(token, JWT_SECRET, (err, usuario) => {
+        if (err) return res.status(403).json({ error: 'Token inválido' });
+        req.usuario = usuario;
+        next();
+    });
+}
+
 // Obtener todos los cómics subidos por un usuario
 app.get('/usuario/:id/comics', (req, res) => {
     const usuarioId = req.params.id;
@@ -256,16 +268,17 @@ app.get('/usuario/:id/comics', (req, res) => {
 
 const URL_COMIC_DEFAULT = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753606561/preview_ow9ltw.png';
 
-app.post('/comic', uploadComic.single('portada'), (req, res) => {
+app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => {
     const {
         titulo,
         descripcion,
-        autor_id,
         idioma_id,
         estado,
         tipo,
         generos
     } = req.body;
+
+    const autor_id = req.usuario.id;
 
     if (!titulo || !descripcion || !autor_id  || !idioma_id) {
         return res.status(400).json({ error: 'Faltan campos obligatorios' });
