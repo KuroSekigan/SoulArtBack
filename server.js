@@ -217,7 +217,14 @@ app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
             console.error('❌ Error al actualizar usuario:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
         }
-        res.json({ success: true, message: 'Perfil actualizado correctamente' });
+    
+        // Respondemos con los campos actualizados
+        const responseData = { success: true, message: 'Perfil actualizado correctamente' };
+        if (nuevaFotoPerfil) {
+            responseData.foto_perfil = nuevaFotoPerfil;
+        }
+    
+        res.json(responseData);
     });
 });
 
