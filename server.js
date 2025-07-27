@@ -51,6 +51,16 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage });
 
+const storageComics = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "comics",
+        allowed_formats: ["jpg", "png", "jpeg"]
+    }
+});
+
+const uploadComic = multer({ storage: storageComics });
+
 // Ruta para registrar usuario
 app.post('/registro', upload.single('imagen'), async (req, res) => {
     try {
@@ -241,6 +251,57 @@ app.get('/usuario/:id/comics', (req, res) => {
         }
 
         res.json(results);
+    });
+});
+
+const URL_COMIC_DEFAULT = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753606561/preview_ow9ltw.png';
+
+app.post('/comic', uploadComic.single('portada'), (req, res) => {
+    const {
+        titulo,
+        descripcion,
+        autor_id,
+        estado,
+        tipo,
+        generos
+    } = req.body;
+
+    if (!titulo || !descripcion || !autor_id) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios' });
+    }
+
+    const portada_url = req.file?.path || URL_COMIC_DEFAULT;
+
+    const sql = `
+        INSERT INTO comics (
+            titulo, descripcion, autor_id,
+            estado, tipo, generos,
+            publicacion, portada_url, fecha_creacion
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'solicitud', ?, NOW())
+    `;
+
+    const valores = [
+        titulo,
+        descripcion,
+        autor_id,
+        estado || 'en progreso',
+        tipo || 'comic',
+        generos || '',
+        portada_url
+    ];
+
+    db.query(sql, valores, (err, result) => {
+        if (err) {
+            console.error('❌ Error al insertar cómic:', err);
+            return res.status(500).json({ error: 'Error en el servidor al guardar el cómic' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Cómic creado correctamente',
+            comic_id: result.insertId
+        });
     });
 });
 
