@@ -173,6 +173,54 @@ app.get('/usuario/:id/perfil', (req, res) => {
     });
 });
 
+app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
+    const userId = req.params.id;
+    const { biografia, twitter_url, facebook_url, instagram_url } = req.body;
+
+    // Si se subió nueva imagen, usamos esa, si no, dejamos como está
+    const nuevaFotoPerfil = req.file?.path;
+
+    let sql = `UPDATE usuarios SET `;
+    const campos = [];
+    const valores = [];
+
+    if (nuevaFotoPerfil) {
+        campos.push('foto_perfil = ?');
+        valores.push(nuevaFotoPerfil);
+    }
+    if (biografia !== undefined) {
+        campos.push('biografia = ?');
+        valores.push(biografia);
+    }
+    if (twitter_url !== undefined) {
+        campos.push('twitter_url = ?');
+        valores.push(twitter_url);
+    }
+    if (facebook_url !== undefined) {
+        campos.push('facebook_url = ?');
+        valores.push(facebook_url);
+    }
+    if (instagram_url !== undefined) {
+        campos.push('instagram_url = ?');
+        valores.push(instagram_url);
+    }
+
+    if (campos.length === 0) {
+        return res.status(400).json({ error: 'No hay campos para actualizar' });
+    }
+
+    sql += campos.join(', ') + ' WHERE id = ?';
+    valores.push(userId);
+
+    db.query(sql, valores, (err, result) => {
+        if (err) {
+            console.error('❌ Error al actualizar usuario:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+        res.json({ success: true, message: 'Perfil actualizado correctamente' });
+    });
+});
+
 app.get('/favoritos/:id_usuario', (req, res) => {
     const id_usuario = req.params.id_usuario;
 
