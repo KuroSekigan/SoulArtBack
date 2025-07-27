@@ -178,7 +178,7 @@ app.get('/favoritos/:usuario_id', (req, res) => {
 
     const sql = `
         SELECT c.id, c.titulo, c.portada_url
-        FROM favoritos_comics f 
+        FROM favoritos f 
         JOIN comics c ON f.comic_id = c.id 
         WHERE f.usuario_id = ?
     `;
@@ -195,7 +195,7 @@ app.get('/favoritos/:usuario_id', (req, res) => {
 app.post('/favoritos', (req, res) => {
     const { usuario_id, comic_id } = req.body;
 
-    const sql = `INSERT IGNORE INTO favoritos_comics (usuario_id, comic_id) VALUES (?, ?)`;
+    const sql = `INSERT IGNORE INTO favoritos (usuario_id, comic_id) VALUES (?, ?)`;
     db.query(sql, [usuario_id, comic_id], (err, result) => {
         if (err) {
             console.error('Error al seguir cómic:', err);
@@ -208,7 +208,7 @@ app.post('/favoritos', (req, res) => {
 app.delete('/favoritos', (req, res) => {
     const { usuario_id, comic_id } = req.body;
 
-    const sql = `DELETE FROM favoritos_comics WHERE usuario_id = ? AND comic_id = ?`;
+    const sql = `DELETE FROM favoritos WHERE usuario_id = ? AND comic_id = ?`;
     db.query(sql, [usuario_id, comic_id], (err, result) => {
         if (err) {
             console.error('Error al dejar de seguir cómic:', err);
