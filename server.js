@@ -173,17 +173,17 @@ app.get('/usuario/:id/perfil', (req, res) => {
     });
 });
 
-app.get('/favoritos/:usuario_id', (req, res) => {
-    const usuario_id = req.params.usuario_id;
+app.get('/favoritos/:id_usuario', (req, res) => {
+    const id_usuario = req.params.id_usuario;
 
     const sql = `
         SELECT c.id, c.titulo, c.portada_url
         FROM favoritos f 
-        JOIN comics c ON f.comic_id = c.id 
-        WHERE f.usuario_id = ?
+        JOIN comics c ON f.id_comic = c.id 
+        WHERE f.id_usuario = ?
     `;
 
-    db.query(sql, [usuario_id], (err, results) => {
+    db.query(sql, [id_usuario], (err, results) => {
         if (err) {
             console.error('Error al obtener favoritos:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
@@ -193,10 +193,10 @@ app.get('/favoritos/:usuario_id', (req, res) => {
 });
 
 app.post('/favoritos', (req, res) => {
-    const { usuario_id, comic_id } = req.body;
+    const { id_usuario, id_comic } = req.body;
 
-    const sql = `INSERT IGNORE INTO favoritos (usuario_id, comic_id) VALUES (?, ?)`;
-    db.query(sql, [usuario_id, comic_id], (err, result) => {
+    const sql = `INSERT IGNORE INTO favoritos (id_usuario, id_comic) VALUES (?, ?)`;
+    db.query(sql, [id_usuario, id_comic], (err, result) => {
         if (err) {
             console.error('Error al seguir cómic:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
@@ -206,10 +206,10 @@ app.post('/favoritos', (req, res) => {
 });
 
 app.delete('/favoritos', (req, res) => {
-    const { usuario_id, comic_id } = req.body;
+    const { id_usuario, id_comic } = req.body;
 
-    const sql = `DELETE FROM favoritos WHERE usuario_id = ? AND comic_id = ?`;
-    db.query(sql, [usuario_id, comic_id], (err, result) => {
+    const sql = `DELETE FROM favoritos WHERE id_usuario = ? AND id_comic = ?`;
+    db.query(sql, [id_usuario, id_comic], (err, result) => {
         if (err) {
             console.error('Error al dejar de seguir cómic:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
