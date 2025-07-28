@@ -61,6 +61,16 @@ const storageComics = new CloudinaryStorage({
 
 const uploadComic = multer({ storage: storageComics });
 
+const storagePaginas = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "paginas",
+        allowed_formats: ["jpg", "png", "jpeg"]
+    }
+});
+
+const uploadPaginas = multer({ storage: storagePaginas });
+
 // Ruta para registrar usuario
 app.post('/registro', upload.single('imagen'), async (req, res) => {
     try {
@@ -383,32 +393,65 @@ app.get('/comic/:id/capitulos', (req, res) => {
     });
 });
 
-app.post('/comic/:comicId/capitulos', verificarToken, (req, res) => {
+// Subir capítulo + páginas
+app.post('/comic/:comicId/capitulos', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
     const comicId = req.params.comicId;
     const { titulo, numero } = req.body;
+    const imagenes = req.files;
 
     if (!titulo || !numero) {
         return res.status(400).json({ error: 'Faltan campos obligatorios: título o número' });
     }
 
-    const sql = `
+    // Paso 1: insertar el capítulo
+    const sqlCapitulo = `
         INSERT INTO capitulos (comic_id, titulo, numero, fecha_publicacion)
         VALUES (?, ?, ?, NOW())
     `;
 
-    const valores = [comicId, titulo, numero];
-
-    db.query(sql, valores, (err, result) => {
+    db.query(sqlCapitulo, [comicId, titulo, numero], (err, result) => {
         if (err) {
             console.error('❌ Error al insertar capítulo:', err);
-            return res.status(500).json({ error: 'Error al subir capítulo' });
+            return res.status(500).json({ error: 'Error al crear capítulo' });
         }
 
-        res.json({
-            success: true,
-            message: 'Capítulo subido correctamente',
-            capitulo_id: result.insertId
-        });
+        const capituloId = result.insertId;
+        const defaultUrl = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png';
+
+        // Paso 2: insertar páginas (si no hay imágenes, usar solo una página con imagen por defecto)
+        const sqlPagina = `
+            INSERT INTO paginas (capitulo_id, numero, imagen_url)
+            VALUES (?, ?, ?)
+        `;
+
+        const tareas = (imagenes && imagenes.length > 0)
+            ? imagenes.map((img, index) => {
+                return new Promise((resolve, reject) => {
+                    db.query(sqlPagina, [capituloId, index + 1, img.path], (err, result) => {
+                        if (err) return reject(err);
+                        resolve(result);
+                    });
+                });
+            })
+            : [new Promise((resolve, reject) => {
+                db.query(sqlPagina, [capituloId, 1, defaultUrl], (err, result) => {
+                    if (err) return reject(err);
+                    resolve(result);
+                });
+            })];
+
+        Promise.all(tareas)
+            .then(() => {
+                res.json({
+                    success: true,
+                    message: 'Capítulo y páginas subidos correctamente',
+                    capitulo_id: capituloId
+                });
+            })
+            .catch(error => {
+                console.error('❌ Error al insertar páginas:', error);
+                res.status(500).json({ error: 'Error al subir páginas del capítulo' });
+            });
     });
 });
 
