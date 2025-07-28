@@ -363,6 +363,26 @@ app.get('/favoritos/:id_usuario', (req, res) => {
     });
 });
 
+app.get('/comic/:id/capitulos', (req, res) => {
+    const comicId = req.params.id;
+
+    const sql = `
+        SELECT id, titulo, numero, fecha_publicación
+        FROM capitulos
+        WHERE comic_id = ?
+        ORDER BY numero ASC
+    `;
+
+    db.query(sql, [comicId], (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener capítulos:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
 app.post('/favoritos', (req, res) => {
     const { id_usuario, id_comic } = req.body;
 
