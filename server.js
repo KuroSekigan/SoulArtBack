@@ -481,6 +481,74 @@ app.delete('/capitulo/:id', verificarToken, (req, res) => {
     });
 });
 
+app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
+    const capituloId = req.params.id;
+    const { titulo, numero } = req.body;
+    const nuevasImagenes = req.files;
+
+    if (!titulo || !numero) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios' });
+    }
+
+    // Paso 1: Actualizar los datos del capítulo
+    const sqlUpdateCapitulo = `
+        UPDATE capitulos
+        SET titulo = ?, numero = ?
+        WHERE id = ?
+    `;
+
+    db.query(sqlUpdateCapitulo, [titulo, numero, capituloId], (err) => {
+        if (err) {
+            console.error('❌ Error al actualizar capítulo:', err);
+            return res.status(500).json({ error: 'Error al actualizar capítulo' });
+        }
+
+        // Paso 2: Si hay imágenes nuevas, eliminamos las antiguas y agregamos las nuevas
+        if (nuevasImagenes && nuevasImagenes.length > 0) {
+            const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
+
+            db.query(eliminarPaginasSql, [capituloId], (err) => {
+                if (err) {
+                    console.error('❌ Error al eliminar páginas existentes:', err);
+                    return res.status(500).json({ error: 'Error al eliminar páginas anteriores' });
+                }
+
+                const sqlInsertPagina = `
+                    INSERT INTO paginas (capitulo_id, numero, imagen_url)
+                    VALUES (?, ?, ?)
+                `;
+
+                const tareas = nuevasImagenes.map((img, index) => {
+                    return new Promise((resolve, reject) => {
+                        db.query(sqlInsertPagina, [capituloId, index + 1, img.path], (err) => {
+                            if (err) return reject(err);
+                            resolve();
+                        });
+                    });
+                });
+
+                Promise.all(tareas)
+                    .then(() => {
+                        res.json({
+                            success: true,
+                            message: 'Capítulo actualizado con nuevas páginas'
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('❌ Error al insertar nuevas páginas:', error);
+                        res.status(500).json({ error: 'Error al insertar nuevas páginas' });
+                    });
+            });
+        } else {
+            // Si no hay nuevas imágenes, solo se actualizó el título/número
+            res.json({
+                success: true,
+                message: 'Capítulo actualizado correctamente (sin modificar páginas)'
+            });
+        }
+    });
+});
+
 app.post('/favoritos', (req, res) => {
     const { id_usuario, id_comic } = req.body;
 
