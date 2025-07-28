@@ -367,9 +367,9 @@ app.get('/comic/:id/capitulos', (req, res) => {
     const comicId = req.params.id;
 
     const sql = `
-        SELECT id, titulo, numero, fecha_publicación
-        FROM capitulos
-        WHERE comic_id = ?
+        SELECT id, titulo, numero, fecha_publicacion 
+        FROM capitulos 
+        WHERE comic_id = ? 
         ORDER BY numero ASC
     `;
 
