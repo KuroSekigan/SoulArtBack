@@ -455,6 +455,32 @@ app.post('/comic/:comicId/capitulos', verificarToken, uploadPaginas.array('image
     });
 });
 
+app.delete('/capitulo/:id', verificarToken, (req, res) => {
+    const capituloId = req.params.id;
+
+    // Primero eliminamos las páginas asociadas
+    const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
+
+    db.query(eliminarPaginasSql, [capituloId], (err) => {
+        if (err) {
+            console.error('❌ Error al eliminar páginas del capítulo:', err);
+            return res.status(500).json({ error: 'Error al eliminar páginas' });
+        }
+
+        // Luego eliminamos el capítulo
+        const eliminarCapituloSql = 'DELETE FROM capitulos WHERE id = ?';
+
+        db.query(eliminarCapituloSql, [capituloId], (err) => {
+            if (err) {
+                console.error('❌ Error al eliminar capítulo:', err);
+                return res.status(500).json({ error: 'Error al eliminar capítulo' });
+            }
+
+            res.json({ success: true, message: 'Capítulo y sus páginas eliminados correctamente' });
+        });
+    });
+});
+
 app.post('/favoritos', (req, res) => {
     const { id_usuario, id_comic } = req.body;
 
