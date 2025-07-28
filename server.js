@@ -320,6 +320,30 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
     });
 });
 
+app.get('/comic/:id', (req, res) => {
+    const comicId = req.params.id;
+
+    const sql = `
+        SELECT comics.*, usuarios.nombre_usuario AS autor
+        FROM comics
+        JOIN usuarios ON comics.autor_id = usuarios.id
+        WHERE comics.id = ?
+    `;
+
+    db.query(sql, [comicId], (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómic:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ error: 'Cómic no encontrado' });
+        }
+
+        res.json(results[0]);
+    });
+});
+
 app.get('/favoritos/:id_usuario', (req, res) => {
     const id_usuario = req.params.id_usuario;
 
