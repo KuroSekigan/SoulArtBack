@@ -383,6 +383,35 @@ app.get('/comic/:id/capitulos', (req, res) => {
     });
 });
 
+app.post('/comic/:comicId/capitulos', verificarToken, (req, res) => {
+    const comicId = req.params.comicId;
+    const { titulo, numero } = req.body;
+
+    if (!titulo || !numero) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios: título o número' });
+    }
+
+    const sql = `
+        INSERT INTO capitulos (comic_id, titulo, numero, fecha_publicacion)
+        VALUES (?, ?, ?, NOW())
+    `;
+
+    const valores = [comicId, titulo, numero];
+
+    db.query(sql, valores, (err, result) => {
+        if (err) {
+            console.error('❌ Error al insertar capítulo:', err);
+            return res.status(500).json({ error: 'Error al subir capítulo' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Capítulo subido correctamente',
+            capitulo_id: result.insertId
+        });
+    });
+});
+
 app.post('/favoritos', (req, res) => {
     const { id_usuario, id_comic } = req.body;
 
