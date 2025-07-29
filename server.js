@@ -482,7 +482,7 @@ app.get('/capitulo/:id', (req, res) => {
         const paginasConUrl = paginasResult.map(pagina => ({
           id: pagina.id,
           numero: pagina.numero,
-          url: pagina.url
+          url: pagina.imagen_url
         }));
 
         res.json({
