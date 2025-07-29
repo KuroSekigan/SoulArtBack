@@ -398,7 +398,7 @@ app.get('/capitulo/:id', async (req, res) => {
 
   try {
     // Buscar el capítulo
-    const [capituloResult] = await conexion.query(
+    const [capituloResult] = await db.query(
       'SELECT * FROM capitulos WHERE id = ?',
       [id]
     );
@@ -410,7 +410,7 @@ app.get('/capitulo/:id', async (req, res) => {
     const capitulo = capituloResult[0];
 
     // Buscar las páginas asociadas al capítulo
-    const [paginasResult] = await conexion.query(
+    const [paginasResult] = await db.query(
       'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
       [id]
     );
