@@ -471,7 +471,7 @@ app.get('/capitulo/:id', (req, res) => {
     const capitulo = capituloResult[0];
 
     db.query(
-      'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
+      'SELECT * FROM paginas WHERE capitulo_id = ? ORDER BY numero ASC',
       [id],
       (errPag, paginasResult) => {
         if (errPag) {
