@@ -24,7 +24,7 @@ const db = mysql.createConnection({
     user: 'root',
     password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',
     database: 'railway'
-}).promise();
+})
 
 db.connect((err) => {
     if (err) {
