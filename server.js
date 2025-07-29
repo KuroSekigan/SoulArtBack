@@ -393,50 +393,45 @@ app.get('/comic/:id/capitulos', (req, res) => {
     });
 });
 
-app.get('/capitulo/:id', async (req, res) => {
+app.get('/capitulo/:id', (req, res) => {
   const { id } = req.params;
 
-  try {
-    // Buscar el capítulo
-    const [capituloResult] = await db.query(
-      'SELECT * FROM capitulos WHERE id = ?',
-      [id]
-    );
+  // Buscar el capítulo
+  db.query('SELECT * FROM capitulos WHERE id = ?', [id])
+    .then(([capituloResult]) => {
+      if (capituloResult.length === 0) {
+        return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
+      }
 
-    if (capituloResult.length === 0) {
-      return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
-    }
+      const capitulo = capituloResult[0];
 
-    const capitulo = capituloResult[0];
+      // Buscar las páginas asociadas
+      return db.query(
+        'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
+        [id]
+      ).then(([paginasResult]) => {
+        const paginasConUrl = paginasResult.map(pagina => ({
+          id: pagina.id,
+          numero: pagina.numero,
+          url: pagina.url && pagina.url.trim() !== ''
+            ? pagina.url
+            : 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png'
+        }));
 
-    // Buscar las páginas asociadas al capítulo
-    const [paginasResult] = await db.query(
-      'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
-      [id]
-    );
-
-    // Si una página no tiene URL, usar la imagen por defecto
-    const paginasConUrl = paginasResult.map(pagina => ({
-      id: pagina.id,
-      numero: pagina.numero,
-      url: pagina.url && pagina.url.trim() !== ''
-        ? pagina.url
-        : 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png'
-    }));
-
-    // Respuesta final
-    res.json({
-      id: capitulo.id,
-      titulo: capitulo.titulo,
-      numero: capitulo.numero,
-      id_comic: capitulo.id_comic,
-      paginas: paginasConUrl
+        // Enviar la respuesta
+        res.json({
+          id: capitulo.id,
+          titulo: capitulo.titulo,
+          numero: capitulo.numero,
+          id_comic: capitulo.id_comic,
+          paginas: paginasConUrl
+        });
+      });
+    })
+    .catch(error => {
+      console.error('Error al obtener capítulo:', error);
+      res.status(500).json({ mensaje: 'Error interno del servidor' });
     });
-
-  } catch (error) {
-    console.error('Error al obtener capítulo:', error);
-    res.status(500).json({ mensaje: 'Error interno del servidor' });
-  }
 });
 
 // Subir capítulo + páginas
