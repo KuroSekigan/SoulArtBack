@@ -19,7 +19,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Conexión a la base de datos
-const db = mysql.createConnection({
+const mysql = require('mysql2/promise');
+
+const db = await mysql.createConnection({
     host: 'mysql.railway.internal',
     user: 'root',
     password: 'lvaikfyVcXOZeSkpgIFqECHQyrQXvgaP',
@@ -393,45 +395,43 @@ app.get('/comic/:id/capitulos', (req, res) => {
     });
 });
 
-app.get('/capitulo/:id', (req, res) => {
+app.get('/capitulo/:id', async (req, res) => {
   const { id } = req.params;
 
-  // Buscar el capítulo
-  db.query('SELECT * FROM capitulos WHERE id = ?', [id])
-    .then(([capituloResult]) => {
-      if (capituloResult.length === 0) {
-        return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
-      }
+  try {
+    const [capituloResult] = await db.query('SELECT * FROM capitulos WHERE id = ?', [id]);
 
-      const capitulo = capituloResult[0];
+    if (capituloResult.length === 0) {
+      return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
+    }
 
-      // Buscar las páginas asociadas
-      return db.query(
-        'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
-        [id]
-      ).then(([paginasResult]) => {
-        const paginasConUrl = paginasResult.map(pagina => ({
-          id: pagina.id,
-          numero: pagina.numero,
-          url: pagina.url && pagina.url.trim() !== ''
-            ? pagina.url
-            : 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png'
-        }));
+    const capitulo = capituloResult[0];
 
-        // Enviar la respuesta
-        res.json({
-          id: capitulo.id,
-          titulo: capitulo.titulo,
-          numero: capitulo.numero,
-          id_comic: capitulo.id_comic,
-          paginas: paginasConUrl
-        });
-      });
-    })
-    .catch(error => {
-      console.error('Error al obtener capítulo:', error);
-      res.status(500).json({ mensaje: 'Error interno del servidor' });
+    const [paginasResult] = await db.query(
+      'SELECT * FROM paginas WHERE id_capitulo = ? ORDER BY numero ASC',
+      [id]
+    );
+
+    const paginasConUrl = paginasResult.map(pagina => ({
+      id: pagina.id,
+      numero: pagina.numero,
+      url: pagina.url && pagina.url.trim() !== ''
+        ? pagina.url
+        : 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png'
+    }));
+
+    res.json({
+      id: capitulo.id,
+      titulo: capitulo.titulo,
+      numero: capitulo.numero,
+      id_comic: capitulo.id_comic,
+      paginas: paginasConUrl
     });
+
+  } catch (error) {
+    console.error('Error al obtener capítulo:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
 });
 
 // Subir capítulo + páginas
