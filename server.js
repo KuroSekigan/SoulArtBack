@@ -482,9 +482,7 @@ app.get('/capitulo/:id', (req, res) => {
         const paginasConUrl = paginasResult.map(pagina => ({
           id: pagina.id,
           numero: pagina.numero,
-          url: pagina.url && pagina.url.trim() !== ''
-            ? pagina.url
-            : 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png'
+          url: pagina.url
         }));
 
         res.json({
