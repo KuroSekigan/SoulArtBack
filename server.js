@@ -851,7 +851,7 @@ app.post('/comics/:comicId/reaccion', (req, res) => {
         const usuarioId = userData.id;
 
         const sql = `
-            INSERT INTO reacciones_comics (usuario_id, comic_id, tipo)
+            INSERT INTO reacciones_comics (id_usuario, id_comic, tipo)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE tipo = VALUES(tipo), fecha = CURRENT_TIMESTAMP
         `;
@@ -875,7 +875,7 @@ app.get('/comics/:comicId/reacciones', (req, res) => {
             SUM(tipo = 'like') AS likes,
             SUM(tipo = 'dislike') AS dislikes
         FROM reacciones_comics
-        WHERE comic_id = ?
+        WHERE id_comic = ?
     `;
 
     db.query(sql, [comicId], (err, results) => {
@@ -901,7 +901,7 @@ app.get('/comics/:comicId/mi-reaccion', (req, res) => {
 
         const sql = `
             SELECT tipo FROM reacciones_comics
-            WHERE usuario_id = ? AND comic_id = ?
+            WHERE id_usuario = ? AND id_comic = ?
         `;
 
         db.query(sql, [usuarioId, comicId], (err, results) => {
