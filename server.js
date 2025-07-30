@@ -838,10 +838,88 @@ app.delete('/favoritos', (req, res) => {
     });
 });
 
-// Ruta base
-app.get('/', (req, res) => {
-    res.json({ message: 'API backend funcionando' });
+app.post('/comics/:comicId/reaccion', (req, res) => {
+    const token = req.headers.authorization;
+    const { tipo } = req.body; // "like" o "dislike"
+    const comicId = req.params.comicId;
+
+    if (!token) return res.status(401).json({ error: 'Token requerido' });
+
+    jwt.verify(token, "tu_secreto_jwt", (err, userData) => {
+        if (err) return res.status(403).json({ error: 'Token inválido' });
+
+        const usuarioId = userData.id;
+
+        const sql = `
+            INSERT INTO reacciones (usuario_id, comic_id, tipo)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE tipo = VALUES(tipo), fecha = CURRENT_TIMESTAMP
+        `;
+
+        db.query(sql, [usuarioId, comicId, tipo], (err) => {
+            if (err) {
+                console.error("Error al registrar reacción:", err);
+                return res.status(500).json({ error: "Error al guardar reacción" });
+            }
+
+            res.json({ mensaje: "Reacción registrada correctamente" });
+        });
+    });
 });
+
+app.get('/comics/:comicId/reacciones', (req, res) => {
+    const comicId = req.params.comicId;
+
+    const sql = `
+        SELECT 
+            SUM(tipo = 'like') AS likes,
+            SUM(tipo = 'dislike') AS dislikes
+        FROM reacciones
+        WHERE comic_id = ?
+    `;
+
+    db.query(sql, [comicId], (err, results) => {
+        if (err) {
+            console.error("Error al obtener reacciones:", err);
+            return res.status(500).json({ error: "Error al obtener reacciones" });
+        }
+
+        res.json(results[0]);
+    });
+});
+
+app.get('/comics/:comicId/mi-reaccion', (req, res) => {
+    const token = req.headers.authorization;
+    const comicId = req.params.comicId;
+
+    if (!token) return res.status(401).json({ error: 'Token requerido' });
+
+    jwt.verify(token, "tu_secreto_jwt", (err, userData) => {
+        if (err) return res.status(403).json({ error: 'Token inválido' });
+
+        const usuarioId = userData.id;
+
+        const sql = `
+            SELECT tipo FROM reacciones
+            WHERE usuario_id = ? AND comic_id = ?
+        `;
+
+        db.query(sql, [usuarioId, comicId], (err, results) => {
+            if (err) {
+                console.error("Error al consultar reacción:", err);
+                return res.status(500).json({ error: "Error al obtener reacción" });
+            }
+
+            if (results.length === 0) {
+                return res.json({ tipo: null }); // No reaccionó
+            }
+
+            res.json({ tipo: results[0].tipo });
+        });
+    });
+});
+
+
 
 // Puerto
 const PORT = 3001;
