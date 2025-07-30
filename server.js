@@ -276,6 +276,26 @@ app.get('/usuario/:id/comics', (req, res) => {
     });
 });
 
+// Obtener todos los cómics que estén en estado "publicado"
+app.get('/comics/publicados', (req, res) => {
+    const sql = `
+        SELECT comics.*, usuarios.nombre_usuario AS autor
+        FROM comics
+        JOIN usuarios ON comics.autor_id = usuarios.id
+        WHERE comics.publicacion = 'publicado'
+        ORDER BY comics.fecha_creacion DESC
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics publicados:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
 const URL_COMIC_DEFAULT = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753606561/preview_ow9ltw.png';
 
 app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => {
