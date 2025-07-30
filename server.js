@@ -840,6 +840,22 @@ app.delete('/favoritos', verificarToken, (req, res) => {
     });
 });
 
+app.get('/usuarios/favoritos/:comicId', verificarToken, (req, res) => {
+  const usuarioId = req.usuario.id;
+  const comicId = req.params.comicId;
+
+  const sql = `SELECT 1 FROM favoritos WHERE id_usuario = ? AND id_comic = ? LIMIT 1`;
+  db.query(sql, [usuarioId, comicId], (err, results) => {
+    if (err) {
+      console.error('Error al verificar favorito:', err);
+      return res.status(500).json({ error: 'Error del servidor' });
+    }
+
+    const esFavorito = results.length > 0;
+    res.json({ esFavorito });
+  });
+});
+
 app.post('/comics/:comicId/reaccion', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const { tipo } = req.body; // "like" o "dislike"
