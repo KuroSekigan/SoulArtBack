@@ -889,7 +889,7 @@ app.get('/comics/:comicId/reacciones', (req, res) => {
 });
 
 app.get('/comics/:comicId/mi-reaccion', (req, res) => {
-    const token = req.headers.authorization;
+    const token = req.headers.authorization?.split(' ')[1];
     const comicId = req.params.comicId;
 
     if (!token) return res.status(401).json({ error: 'Token requerido' });
