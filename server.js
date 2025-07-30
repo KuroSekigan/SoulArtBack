@@ -812,8 +812,9 @@ app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, 
     });
 });
 
-app.post('/favoritos', (req, res) => {
-    const { id_usuario, id_comic } = req.body;
+app.post('/favoritos', verificarToken, (req, res) => {
+    const id_usuario = req.usuario.id; // viene del token
+    const { id_comic } = req.body;
 
     const sql = `INSERT IGNORE INTO favoritos (id_usuario, id_comic) VALUES (?, ?)`;
     db.query(sql, [id_usuario, id_comic], (err, result) => {
@@ -825,8 +826,9 @@ app.post('/favoritos', (req, res) => {
     });
 });
 
-app.delete('/favoritos', (req, res) => {
-    const { id_usuario, id_comic } = req.body;
+app.delete('/favoritos', verificarToken, (req, res) => {
+    const id_usuario = req.usuario.id; // del token
+    const { id_comic } = req.body;
 
     const sql = `DELETE FROM favoritos WHERE id_usuario = ? AND id_comic = ?`;
     db.query(sql, [id_usuario, id_comic], (err, result) => {
