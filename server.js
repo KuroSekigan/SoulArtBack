@@ -919,8 +919,6 @@ app.get('/comics/:comicId/mi-reaccion', (req, res) => {
     });
 });
 
-
-
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
