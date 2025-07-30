@@ -845,7 +845,7 @@ app.post('/comics/:comicId/reaccion', (req, res) => {
 
     if (!token) return res.status(401).json({ error: 'Token requerido' });
 
-    jwt.verify(token, "tu_secreto_jwt", (err, userData) => {
+    jwt.verify(token, JWT_SECRET, (err, userData) => {
         if (err) return res.status(403).json({ error: 'Token inválido' });
 
         const usuarioId = userData.id;
@@ -894,7 +894,7 @@ app.get('/comics/:comicId/mi-reaccion', (req, res) => {
 
     if (!token) return res.status(401).json({ error: 'Token requerido' });
 
-    jwt.verify(token, "tu_secreto_jwt", (err, userData) => {
+    jwt.verify(token, JWT_SECRET, (err, userData) => {
         if (err) return res.status(403).json({ error: 'Token inválido' });
 
         const usuarioId = userData.id;
