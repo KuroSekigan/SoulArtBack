@@ -674,10 +674,7 @@ app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, 
             return res.status(500).json({ error: 'Error al actualizar capítulo' });
         }
 
-        // Si hay nuevas imágenes, eliminamos globos y páginas antiguas
         if (nuevasImagenes && nuevasImagenes.length > 0) {
-
-            // 1. Obtener IDs de las páginas actuales
             const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
             db.query(obtenerPaginasSql, [capituloId], (err, paginas) => {
                 if (err) {
@@ -687,61 +684,103 @@ app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, 
 
                 const paginaIds = paginas.map(p => p.id);
 
-                // 2. Eliminar globos_texto asociados a esas páginas
+                const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
+                const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
+
+                const continuar = () => {
+                    db.query(eliminarPaginasSql, [capituloId], (err) => {
+                        if (err) {
+                            console.error('❌ Error al eliminar páginas existentes:', err);
+                            return res.status(500).json({ error: 'Error al eliminar páginas anteriores' });
+                        }
+
+                        const sqlInsertPagina = `
+                            INSERT INTO paginas (capitulo_id, numero, imagen_url)
+                            VALUES (?, ?, ?)
+                        `;
+
+                        const tareas = nuevasImagenes.map((img, index) => {
+                            return new Promise((resolve, reject) => {
+                                db.query(sqlInsertPagina, [capituloId, index + 1, img.path], (err) => {
+                                    if (err) return reject(err);
+                                    resolve();
+                                });
+                            });
+                        });
+
+                        Promise.all(tareas)
+                            .then(() => {
+                                const globos = JSON.parse(req.body.globos || '[]');
+
+                                // Volver a obtener las nuevas páginas insertadas
+                                const obtenerNuevasPaginas = 'SELECT id FROM paginas WHERE capitulo_id = ? ORDER BY numero ASC';
+                                db.query(obtenerNuevasPaginas, [capituloId], (err, nuevasPaginas) => {
+                                    if (err) {
+                                        console.error('❌ Error al obtener nuevas páginas:', err);
+                                        return res.status(500).json({ error: 'Error al obtener nuevas páginas' });
+                                    }
+
+                                    const sqlInsertGlobo = `
+                                        INSERT INTO globos_texto 
+                                        (pagina_id, tipo, texto, x, y, ancho, alto, fuente, tamano)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    `;
+
+                                    const tareasGlobos = globos.map(globo => {
+                                        const pagina = nuevasPaginas[globo.paginaIndice];
+                                        if (!pagina) return null;
+
+                                        return new Promise((resolve, reject) => {
+                                            db.query(sqlInsertGlobo, [
+                                                pagina.id,
+                                                globo.tipo || 'normal',
+                                                globo.texto,
+                                                parseFloat(globo.x),
+                                                parseFloat(globo.y),
+                                                parseFloat(globo.ancho),
+                                                parseFloat(globo.alto),
+                                                globo.fuente || 'Arial',
+                                                globo.tamano || 14
+                                            ], (err) => {
+                                                if (err) return reject(err);
+                                                resolve();
+                                            });
+                                        });
+                                    }).filter(Boolean);
+
+                                    Promise.all(tareasGlobos)
+                                        .then(() => {
+                                            res.json({
+                                                success: true,
+                                                message: 'Capítulo actualizado con nuevas páginas y globos'
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.error('❌ Error al insertar globos:', error);
+                                            res.status(500).json({ error: 'Error al insertar globos' });
+                                        });
+                                });
+                            })
+                            .catch((error) => {
+                                console.error('❌ Error al insertar nuevas páginas:', error);
+                                res.status(500).json({ error: 'Error al insertar nuevas páginas' });
+                            });
+                    });
+                };
+
                 if (paginaIds.length > 0) {
-                    const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
                     db.query(eliminarGlobosSql, [paginaIds], (err) => {
                         if (err) {
                             console.error('❌ Error al eliminar globos:', err);
                             return res.status(500).json({ error: 'Error al eliminar globos anteriores' });
                         }
-
-                        eliminarPaginasEInsertarNuevas();
+                        continuar();
                     });
                 } else {
-                    eliminarPaginasEInsertarNuevas();
+                    continuar();
                 }
             });
-
-            function eliminarPaginasEInsertarNuevas() {
-                // 3. Eliminar páginas antiguas
-                const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
-                db.query(eliminarPaginasSql, [capituloId], (err) => {
-                    if (err) {
-                        console.error('❌ Error al eliminar páginas existentes:', err);
-                        return res.status(500).json({ error: 'Error al eliminar páginas anteriores' });
-                    }
-
-                    // 4. Insertar nuevas páginas
-                    const sqlInsertPagina = `
-                        INSERT INTO paginas (capitulo_id, numero, imagen_url)
-                        VALUES (?, ?, ?)
-                    `;
-
-                    const tareas = nuevasImagenes.map((img, index) => {
-                        return new Promise((resolve, reject) => {
-                            db.query(sqlInsertPagina, [capituloId, index + 1, img.path], (err) => {
-                                if (err) return reject(err);
-                                resolve();
-                            });
-                        });
-                    });
-
-                    Promise.all(tareas)
-                        .then(() => {
-                            res.json({
-                                success: true,
-                                message: 'Capítulo actualizado con nuevas páginas y globos eliminados'
-                            });
-                        })
-                        .catch((error) => {
-                            console.error('❌ Error al insertar nuevas páginas:', error);
-                            res.status(500).json({ error: 'Error al insertar nuevas páginas' });
-                        });
-                });
-            }
         } else {
-            // Si no hay nuevas imágenes, solo se actualizó el título/número
             res.json({
                 success: true,
                 message: 'Capítulo actualizado correctamente (sin modificar páginas ni globos)'
