@@ -973,7 +973,7 @@ app.post('/comentarios', (req, res) => {
         VALUES (?, ?, ?, NOW())
     `;
 
-    db.query(sql, [usuarios_id, capitulo_id, contenido], (err, result) => {
+    db.query(sql, [usuario_id, capitulo_id, contenido], (err, result) => {
         if (err) {
             console.error("Error al guardar comentario:", err);
             return res.status(500).json({ error: "Error al guardar comentario" });
