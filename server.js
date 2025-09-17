@@ -944,7 +944,7 @@ app.get('/comentarios/:capituloId', (req, res) => {
     const { capituloId } = req.params;
 
     const sql = `
-        SELECT c.id, c.contenido AS texto, c.fecha, u.username
+        SELECT c.id, c.contenido AS texto, c.fecha, u.nombre_usuario AS autor
         FROM comentarios c
         JOIN usuarios u ON c.usuarios_id = u.id
         WHERE c.capitulo_id = ?
