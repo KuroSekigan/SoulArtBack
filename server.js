@@ -1004,7 +1004,7 @@ app.get('/notificaciones', (req, res) => {
             FROM comentarios c
             JOIN comics co ON c.comic_id = co.id
             JOIN usuarios u ON c.usuario_id = u.id
-            WHERE co.usuario_id = ? AND c.usuario_id != ?
+            WHERE co.autor_id = ? AND c.usuario_id != ?
             ORDER BY c.fecha DESC
             LIMIT 10
         `;
