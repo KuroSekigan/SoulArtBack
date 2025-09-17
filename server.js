@@ -946,7 +946,7 @@ app.get('/comentarios/:capituloId', (req, res) => {
     const sql = `
         SELECT c.id, c.contenido AS texto, c.fecha, u.nombre_usuario AS autor
         FROM comentarios c
-        JOIN usuarios u ON c.usuarios_id = u.id
+        JOIN usuarios u ON c.usuario_id = u.id
         WHERE c.capitulo_id = ?
         ORDER BY c.fecha DESC
     `;
@@ -969,7 +969,7 @@ app.post('/comentarios', (req, res) => {
     }
 
     const sql = `
-        INSERT INTO comentarios (usuarios_id, capitulo_id, contenido, fecha)
+        INSERT INTO comentarios (usuario_id, capitulo_id, contenido, fecha)
         VALUES (?, ?, ?, NOW())
     `;
 
