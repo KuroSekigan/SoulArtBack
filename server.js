@@ -1002,7 +1002,8 @@ app.get('/notificaciones', (req, res) => {
         const sql = `
             SELECT c.id AS comentario_id, co.titulo AS comic, c.contenido, c.fecha, u.nombre_usuario AS autor
             FROM comentarios c
-            JOIN comics co ON c.comic_id = co.id
+            JOIN capitulos ca ON c.capitulo_id = ca.id 
+            JOIN comics co ON co.comic_id = co.id
             JOIN usuarios u ON c.usuario_id = u.id
             WHERE co.autor_id = ? AND c.usuario_id != ?
             ORDER BY c.fecha DESC
