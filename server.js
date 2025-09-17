@@ -962,18 +962,32 @@ app.get('/comentarios/:capituloId', (req, res) => {
 
 // Agregar un comentario
 app.post('/comentarios', (req, res) => {
-    const { usuario_id, capitulo_id, contenido } = req.body;
+    const { capitulo_id, contenido } = req.body;
 
-    if (!usuario_id || !capitulo_id || !contenido) {
+    // Obtener token de headers
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(401).json({ error: "No autorizado" });
+
+    const token = authHeader.split(' ')[1]; // Bearer TOKEN
+
+    let usuarioId;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET); // tu secret
+        usuarioId = decoded.id; // o como guardaste el id en el token
+    } catch (err) {
+        return res.status(401).json({ error: "Token inválido" });
+    }
+
+    if (!capitulo_id || !contenido) {
         return res.status(400).json({ error: "Faltan datos" });
     }
 
     const sql = `
-        INSERT INTO comentarios (usuario_id, capitulo_id, contenido, fecha)
+        INSERT INTO comentarios (id_usuario, capitulo_id, contenido, fecha)
         VALUES (?, ?, ?, NOW())
     `;
 
-    db.query(sql, [usuario_id, capitulo_id, contenido], (err, result) => {
+    db.query(sql, [usuarioId, capitulo_id, contenido], (err, result) => {
         if (err) {
             console.error("Error al guardar comentario:", err);
             return res.status(500).json({ error: "Error al guardar comentario" });
