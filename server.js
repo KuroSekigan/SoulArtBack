@@ -962,9 +962,9 @@ app.get('/comentarios/:capituloId', (req, res) => {
 
 // Agregar un comentario
 app.post('/comentarios', (req, res) => {
-    const { usuarios_id, capitulo_id, contenido } = req.body;
+    const { usuario_id, capitulo_id, contenido } = req.body;
 
-    if (!usuarios_id || !capitulo_id || !contenido) {
+    if (!usuario_id || !capitulo_id || !contenido) {
         return res.status(400).json({ error: "Faltan datos" });
     }
 
