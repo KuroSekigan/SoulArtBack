@@ -937,6 +937,51 @@ app.get('/comics/:comicId/mi-reaccion', (req, res) => {
     });
 });
 
+// Sección de comentarios
+
+// Obtener comentarios de un capítulo
+app.get('/comentarios/:capituloId', (req, res) => {
+    const { capituloId } = req.params;
+
+    const sql = `
+        SELECT c.id, c.contenido AS texto, c.fecha, u.username
+        FROM comentarios c
+        JOIN usuarios u ON c.usuarios_id = u.id
+        WHERE c.capitulo_id = ?
+        ORDER BY c.fecha DESC
+    `;
+
+    db.query(sql, [capituloId], (err, result) => {
+        if (err) {
+            console.error("Error al obtener comentarios:", err);
+            return res.status(500).json({ error: "Error al obtener comentarios" });
+        }
+        res.json(result);
+    });
+});
+
+// Agregar un comentario
+app.post('/comentarios', (req, res) => {
+    const { usuarios_id, capitulo_id, contenido } = req.body;
+
+    if (!usuarios_id || !capitulo_id || !contenido) {
+        return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    const sql = `
+        INSERT INTO comentarios (usuarios_id, capitulo_id, contenido, fecha)
+        VALUES (?, ?, ?, NOW())
+    `;
+
+    db.query(sql, [usuarios_id, capitulo_id, contenido], (err, result) => {
+        if (err) {
+            console.error("Error al guardar comentario:", err);
+            return res.status(500).json({ error: "Error al guardar comentario" });
+        }
+        res.json({ success: true, message: "Comentario agregado" });
+    });
+});
+
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
