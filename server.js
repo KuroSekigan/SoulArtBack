@@ -960,39 +960,30 @@ app.get('/comentarios/:capituloId', (req, res) => {
     });
 });
 
-// Agregar un comentario
+//Subir comentarios
 app.post('/comentarios', (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
     const { capitulo_id, contenido } = req.body;
 
-    // Obtener token de headers
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) return res.status(401).json({ error: "No autorizado" });
+    if (!token) return res.status(401).json({ error: "Token requerido" });
+    if (!capitulo_id || !contenido) return res.status(400).json({ error: "Faltan datos" });
 
-    const token = authHeader.split(' ')[1]; // Bearer TOKEN
+    jwt.verify(token, JWT_SECRET, (err, userData) => {
+        if (err) return res.status(403).json({ error: "Token inválido" });
 
-    let usuarioId;
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // tu secret
-        usuarioId = decoded.id; // o como guardaste el id en el token
-    } catch (err) {
-        return res.status(401).json({ error: "Token inválido" });
-    }
+        const usuario_id = userData.id;
 
-    if (!capitulo_id || !contenido) {
-        return res.status(400).json({ error: "Faltan datos" });
-    }
-
-    const sql = `
-        INSERT INTO comentarios (id_usuario, capitulo_id, contenido, fecha)
-        VALUES (?, ?, ?, NOW())
-    `;
-
-    db.query(sql, [usuarioId, capitulo_id, contenido], (err, result) => {
-        if (err) {
-            console.error("Error al guardar comentario:", err);
-            return res.status(500).json({ error: "Error al guardar comentario" });
-        }
-        res.json({ success: true, message: "Comentario agregado" });
+        const sql = `
+            INSERT INTO comentarios (usuario_id, capitulo_id, contenido, fecha)
+            VALUES (?, ?, ?, NOW())
+        `;
+        db.query(sql, [usuario_id, capitulo_id, contenido], (err, result) => {
+            if (err) {
+                console.error("Error al guardar comentario:", err);
+                return res.status(500).json({ error: "Error al guardar comentario" });
+            }
+            res.json({ success: true, message: "Comentario agregado" });
+        });
     });
 });
 
