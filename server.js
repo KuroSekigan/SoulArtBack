@@ -157,7 +157,7 @@ app.post('/login', (req, res) => {
                         foto_perfil: usuario.foto_perfil
                     },
                     JWT_SECRET,
-                    { expiresIn: '2h' } // el token durará 2 horas
+                    { expiresIn: '8h' } // el token durará 2 horas
                 );
             
                 res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
