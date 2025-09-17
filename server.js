@@ -987,6 +987,39 @@ app.post('/comentarios', (req, res) => {
     });
 });
 
+// Notificaciones
+
+// Obtener notificaciones del usuario
+app.get('/notificaciones', (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token requerido' });
+
+    jwt.verify(token, JWT_SECRET, (err, userData) => {
+        if (err) return res.status(403).json({ error: 'Token inválido' });
+
+        const usuarioId = userData.id;
+
+        const sql = `
+            SELECT c.id AS comentario_id, co.titulo AS comic, c.contenido, c.fecha, u.nombre_usuario AS autor
+            FROM comentarios c
+            JOIN comics co ON c.comic_id = co.id
+            JOIN usuarios u ON c.usuario_id = u.id
+            WHERE co.usuario_id = ? AND c.usuario_id != ?
+            ORDER BY c.fecha DESC
+            LIMIT 10
+        `;
+
+        db.query(sql, [usuarioId, usuarioId], (err, results) => {
+            if (err) {
+                console.error("Error al obtener notificaciones:", err);
+                return res.status(500).json({ error: "Error al obtener notificaciones" });
+            }
+            res.json(results);
+        });
+    });
+});
+
+
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
