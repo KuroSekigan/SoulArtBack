@@ -1035,7 +1035,7 @@ app.post('/notificaciones/vistas', async (req, res) => {
     const userId = user.id;
 
     try {
-      await db.query(`
+      await db.promise().query(`
         UPDATE comentarios c
         JOIN capitulos ca ON c.capitulo_id = ca.id
         JOIN comics co ON ca.comic_id = co.id
