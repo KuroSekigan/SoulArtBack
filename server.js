@@ -1022,29 +1022,34 @@ app.get('/notificaciones', (req, res) => {
 
 app.post('/notificaciones/vistas', async (req, res) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader?.split(' ')[1];
 
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
-    if (err) return res.sendStatus(403);
+  jwt.verify(token, JWT_SECRET, async (err, user) => {
+    if (err) {
+      console.error('Token inválido:', err);
+      return res.sendStatus(403);
+    }
 
     const userId = user.id;
 
-    db.query(`
-      UPDATE comentarios c
-      JOIN capitulos ca ON c.capitulo_id = ca.id
-      JOIN comics co ON ca.comic_id = co.id
-      SET c.visto = 1
-      WHERE co.autor_id = ?`, [userId], (err) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
-        }
-        res.json({ success: true });
-    });
+    try {
+      await db.query(`
+        UPDATE comentarios c
+        JOIN capitulos ca ON c.capitulo_id = ca.id
+        JOIN comics co ON ca.comic_id = co.id
+        SET c.visto = 1
+        WHERE co.autor_id = ?`, [userId]);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
+    }
   });
 });
+
 
 // Puerto
 const PORT = 3001;
