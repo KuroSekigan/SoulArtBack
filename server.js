@@ -1031,19 +1031,18 @@ app.post('/notificaciones/vistas', async (req, res) => {
 
     const userId = user.id;
 
-    try {
-      await db.query(`
-        UPDATE comentarios c
-        JOIN capitulos ca ON c.capitulo_id = ca.id
-        JOIN comics co ON ca.comic_id = co.id
-        SET c.visto = 1
-        WHERE co.autor_id = ?`, [userId]);
-
-      res.json({ success: true });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
-    }
+    db.query(`
+      UPDATE comentarios c
+      JOIN capitulos ca ON c.capitulo_id = ca.id
+      JOIN comics co ON ca.comic_id = co.id
+      SET c.visto = 1
+      WHERE co.autor_id = ?`, [userId], (err) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
+        }
+        res.json({ success: true });
+    });
   });
 });
 
