@@ -1020,20 +1020,31 @@ app.get('/notificaciones', (req, res) => {
     });
 });
 
-app.post('/notificaciones/vistas', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-  try {
-    await db.query(`
-      UPDATE comentarios c
-      JOIN capitulos ca ON c.capitulo_id = ca.id
-      JOIN comics co ON ca.comic_id = co.id
-      SET c.visto = 1
-      WHERE co.autor_id = ?`, [userId]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
-  }
+app.post('/notificaciones/vistas', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+    if (err) return res.sendStatus(403);
+
+    const userId = user.id;
+
+    try {
+      await db.query(`
+        UPDATE comentarios c
+        JOIN capitulos ca ON c.capitulo_id = ca.id
+        JOIN comics co ON ca.comic_id = co.id
+        SET c.visto = 1
+        WHERE co.autor_id = ?`, [userId]);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
+    }
+  });
 });
 
 // Puerto
