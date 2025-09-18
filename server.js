@@ -1000,7 +1000,7 @@ app.get('/notificaciones', (req, res) => {
         const usuarioId = userData.id;
 
         const sql = `
-            SELECT c.id AS comentario_id, co.titulo AS comic, c.contenido, c.fecha, u.nombre_usuario AS autor
+            SELECT c.id AS comentario_id, co.titulo AS comic, c.contenido, c.fecha, u.nombre_usuario AS autor, c.visto
             FROM comentarios c
             JOIN capitulos ca ON c.capitulo_id = ca.id 
             JOIN comics co ON ca.comic_id = co.id
@@ -1020,6 +1020,21 @@ app.get('/notificaciones', (req, res) => {
     });
 });
 
+app.post('/notificaciones/vistas', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await db.query(`
+      UPDATE comentarios c
+      JOIN capitulos ca ON c.capitulo_id = ca.id
+      JOIN comics co ON ca.comic_id = co.id
+      SET c.visto = 1
+      WHERE co.autor_id = ?`, [userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
+  }
+});
 
 // Puerto
 const PORT = 3001;
