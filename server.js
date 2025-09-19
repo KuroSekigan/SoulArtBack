@@ -8,6 +8,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import streamifier from 'streamifier';
 import jwt from 'jsonwebtoken';
+import admin from "firebase-admin";
+import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
 
 // Inicialización
 const app = express();
@@ -159,7 +161,7 @@ app.post('/login', (req, res) => {
                     JWT_SECRET,
                     { expiresIn: '8h' } // el token durará 2 horas
                 );
-            
+
                 res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
@@ -310,7 +312,7 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
 
     const autor_id = req.usuario.id;
 
-    if (!titulo || !descripcion || !autor_id  || !idioma_id) {
+    if (!titulo || !descripcion || !autor_id || !idioma_id) {
         return res.status(400).json({ error: 'Faltan campos obligatorios' });
     }
 
@@ -528,90 +530,90 @@ app.post('/comic/:comicId/capitulos', verificarToken, uploadPaginas.array('image
 });
 
 app.get('/capitulo/:id', (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  db.query('SELECT * FROM capitulos WHERE id = ?', [id], (errCap, capituloResult) => {
-    if (errCap) {
-      console.error('Error al obtener capítulo:', errCap);
-      return res.status(500).json({ mensaje: 'Error interno del servidor' });
-    }
-
-    if (capituloResult.length === 0) {
-      return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
-    }
-
-    const capitulo = capituloResult[0];
-
-    db.query(
-      'SELECT * FROM paginas WHERE capitulo_id = ? ORDER BY numero ASC',
-      [id],
-      (errPag, paginasResult) => {
-        if (errPag) {
-          console.error('Error al obtener páginas:', errPag);
-          return res.status(500).json({ mensaje: 'Error interno del servidor' });
+    db.query('SELECT * FROM capitulos WHERE id = ?', [id], (errCap, capituloResult) => {
+        if (errCap) {
+            console.error('Error al obtener capítulo:', errCap);
+            return res.status(500).json({ mensaje: 'Error interno del servidor' });
         }
 
-        const paginaIds = paginasResult.map(p => p.id);
-        if (paginaIds.length === 0) {
-          // Si no hay páginas, no hay globos
-          return res.json({
-            id: capitulo.id,
-            titulo: capitulo.titulo,
-            numero: capitulo.numero,
-            id_comic: capitulo.id_comic,
-            paginas: []
-          });
+        if (capituloResult.length === 0) {
+            return res.status(404).json({ mensaje: 'Capítulo no encontrado' });
         }
 
-        // Obtener todos los globos para esas páginas
+        const capitulo = capituloResult[0];
+
         db.query(
-          `SELECT * FROM globos_texto WHERE pagina_id IN (?)`,
-          [paginaIds],
-          (errGlobos, globosResult) => {
-            if (errGlobos) {
-              console.error('Error al obtener globos de texto:', errGlobos);
-              return res.status(500).json({ mensaje: 'Error interno del servidor' });
+            'SELECT * FROM paginas WHERE capitulo_id = ? ORDER BY numero ASC',
+            [id],
+            (errPag, paginasResult) => {
+                if (errPag) {
+                    console.error('Error al obtener páginas:', errPag);
+                    return res.status(500).json({ mensaje: 'Error interno del servidor' });
+                }
+
+                const paginaIds = paginasResult.map(p => p.id);
+                if (paginaIds.length === 0) {
+                    // Si no hay páginas, no hay globos
+                    return res.json({
+                        id: capitulo.id,
+                        titulo: capitulo.titulo,
+                        numero: capitulo.numero,
+                        id_comic: capitulo.id_comic,
+                        paginas: []
+                    });
+                }
+
+                // Obtener todos los globos para esas páginas
+                db.query(
+                    `SELECT * FROM globos_texto WHERE pagina_id IN (?)`,
+                    [paginaIds],
+                    (errGlobos, globosResult) => {
+                        if (errGlobos) {
+                            console.error('Error al obtener globos de texto:', errGlobos);
+                            return res.status(500).json({ mensaje: 'Error interno del servidor' });
+                        }
+
+                        // Agrupar globos por pagina_id
+                        const globosPorPagina = {};
+                        globosResult.forEach(globo => {
+                            if (!globosPorPagina[globo.pagina_id]) {
+                                globosPorPagina[globo.pagina_id] = [];
+                            }
+                            globosPorPagina[globo.pagina_id].push({
+                                id: globo.id,
+                                tipo: globo.tipo,
+                                texto: globo.texto,
+                                x: globo.x,
+                                y: globo.y,
+                                ancho: globo.ancho,
+                                alto: globo.alto,
+                                fuente: globo.fuente,
+                                tamano: globo.tamano
+                            });
+                        });
+
+                        // Armar páginas con globos incluidos
+                        const paginasConTodo = paginasResult.map(pagina => ({
+                            id: pagina.id,
+                            numero: pagina.numero,
+                            url: pagina.imagen_url,
+                            globos: globosPorPagina[pagina.id] || []
+                        }));
+
+                        res.json({
+                            id: capitulo.id,
+                            titulo: capitulo.titulo,
+                            numero: capitulo.numero,
+                            id_comic: capitulo.id_comic,
+                            paginas: paginasConTodo
+                        });
+                    }
+                );
             }
-
-            // Agrupar globos por pagina_id
-            const globosPorPagina = {};
-            globosResult.forEach(globo => {
-              if (!globosPorPagina[globo.pagina_id]) {
-                globosPorPagina[globo.pagina_id] = [];
-              }
-              globosPorPagina[globo.pagina_id].push({
-                id: globo.id,
-                tipo: globo.tipo,
-                texto: globo.texto,
-                x: globo.x,
-                y: globo.y,
-                ancho: globo.ancho,
-                alto: globo.alto,
-                fuente: globo.fuente,
-                tamano: globo.tamano
-              });
-            });
-
-            // Armar páginas con globos incluidos
-            const paginasConTodo = paginasResult.map(pagina => ({
-              id: pagina.id,
-              numero: pagina.numero,
-              url: pagina.imagen_url,
-              globos: globosPorPagina[pagina.id] || []
-            }));
-
-            res.json({
-              id: capitulo.id,
-              titulo: capitulo.titulo,
-              numero: capitulo.numero,
-              id_comic: capitulo.id_comic,
-              paginas: paginasConTodo
-            });
-          }
         );
-      }
-    );
-  });
+    });
 });
 
 app.delete('/capitulo/:id', verificarToken, (req, res) => {
@@ -627,7 +629,7 @@ app.delete('/capitulo/:id', verificarToken, (req, res) => {
         }
 
         const paginaIds = paginas.map(p => p.id);
-        
+
         if (paginaIds.length === 0) {
             // No hay páginas, eliminar solo el capítulo
             eliminarCapitulo();
@@ -841,19 +843,19 @@ app.delete('/favoritos', verificarToken, (req, res) => {
 });
 
 app.get('/usuarios/favoritos/:comicId', verificarToken, (req, res) => {
-  const usuarioId = req.usuario.id;
-  const comicId = req.params.comicId;
+    const usuarioId = req.usuario.id;
+    const comicId = req.params.comicId;
 
-  const sql = `SELECT 1 FROM favoritos WHERE id_usuario = ? AND id_comic = ? LIMIT 1`;
-  db.query(sql, [usuarioId, comicId], (err, results) => {
-    if (err) {
-      console.error('Error al verificar favorito:', err);
-      return res.status(500).json({ error: 'Error del servidor' });
-    }
+    const sql = `SELECT 1 FROM favoritos WHERE id_usuario = ? AND id_comic = ? LIMIT 1`;
+    db.query(sql, [usuarioId, comicId], (err, results) => {
+        if (err) {
+            console.error('Error al verificar favorito:', err);
+            return res.status(500).json({ error: 'Error del servidor' });
+        }
 
-    const esFavorito = results.length > 0;
-    res.json({ esFavorito });
-  });
+        const esFavorito = results.length > 0;
+        res.json({ esFavorito });
+    });
 });
 
 app.post('/comics/:comicId/reaccion', (req, res) => {
@@ -1021,33 +1023,33 @@ app.get('/notificaciones', (req, res) => {
 });
 
 app.post('/notificaciones/vistas', async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader?.split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    const token = authHeader?.split(' ')[1];
 
-  if (!token) return res.sendStatus(401);
+    if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, JWT_SECRET, async (err, user) => {
-    if (err) {
-      console.error('Token inválido:', err);
-      return res.sendStatus(403);
-    }
+    jwt.verify(token, JWT_SECRET, async (err, user) => {
+        if (err) {
+            console.error('Token inválido:', err);
+            return res.sendStatus(403);
+        }
 
-    const userId = user.id;
+        const userId = user.id;
 
-    try {
-      await db.promise().query(`
+        try {
+            await db.promise().query(`
         UPDATE comentarios c
         JOIN capitulos ca ON c.capitulo_id = ca.id
         JOIN comics co ON ca.comic_id = co.id
         SET c.visto = 1
         WHERE co.autor_id = ?`, [userId]);
 
-      res.json({ success: true });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
-    }
-  });
+            res.json({ success: true });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
+        }
+    });
 });
 
 
