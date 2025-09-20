@@ -1,5 +1,5 @@
 import admin from "firebase-admin";
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+import serviceAccount from "./soulart-599bf-firebase-adminsdk-fbsvc-644beedef3.json" assert { type: "json" };
 
 // Inicializar Firebase Admin con la clave privada
 admin.initializeApp({
