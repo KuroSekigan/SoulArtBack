@@ -9,7 +9,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import streamifier from 'streamifier';
 import jwt from 'jsonwebtoken';
 //import admin from "firebase-admin";
-i//mport serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+//mport serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
 
 // Inicialización
 const app = express();
