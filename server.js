@@ -280,15 +280,24 @@ app.get('/usuario/:id/comics', (req, res) => {
 
 // Obtener todos los cómics que estén en estado "publicado"
 app.get('/comics/publicados', (req, res) => {
-    const sql = `
+    const { q } = req.query;
+
+    let sql = `
         SELECT comics.*, usuarios.nombre_usuario AS autor
         FROM comics
         JOIN usuarios ON comics.autor_id = usuarios.id
         WHERE comics.publicacion = 'publicado'
-        ORDER BY comics.fecha_creacion DESC
     `;
+    let params = [];
 
-    db.query(sql, (err, results) => {
+    if (q) {
+        sql += ` AND (comics.titulo LIKE ? OR usuarios.nombre_usuario LIKE ?)`;
+        params.push(`%${q}%`, `%${q}%`);
+    }
+
+    sql += ` ORDER BY comics.fecha_creacion DESC`;
+
+    db.query(sql, params, (err, results) => {
         if (err) {
             console.error('❌ Error al obtener cómics publicados:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
