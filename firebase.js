@@ -1,9 +1,14 @@
 import admin from "firebase-admin";
-import serviceAccount from "./soulart-599bf-firebase-adminsdk-fbsvc-644beedef3.json" assert { type: "json" };
 
-// Inicializar Firebase Admin con la clave privada
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert({
+    projectId: serviceAccount.project_id,
+    clientEmail: serviceAccount.client_email,
+    // 🔑 Aquí importante: reemplazamos los "\n" de la private key
+    privateKey: serviceAccount.private_key.replace(/\\n/g, '\n')
+  })
 });
 
 export default admin;
