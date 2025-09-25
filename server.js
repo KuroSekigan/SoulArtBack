@@ -174,6 +174,126 @@ app.post('/login', (req, res) => {
     });
 });
 
+// Ruta para login con Google
+app.post('/google-login', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Token de Google requerido' });
+        }
+
+        // ✅ Verificar token con Firebase Admin
+        const decoded = await admin.auth().verifyIdToken(token);
+
+        const correo = decoded.email;
+        const nombre_usuario = decoded.name || correo.split('@')[0]; // fallback si no hay name
+        const foto_perfil = decoded.picture || 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753396083/default_profile_htx1ge.png';
+
+        // 🔍 Revisar si el usuario ya existe
+        const query = 'SELECT * FROM usuarios WHERE correo = ?';
+        db.query(query, [correo], async (err, results) => {
+            if (err) {
+                console.error('❌ Error en consulta Google login:', err);
+                return res.status(500).json({ error: 'Error en el servidor' });
+            }
+
+            if (results.length > 0) {
+                const usuario = results[0];
+
+                if (usuario.estado_id === 2) {
+                    return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
+                }
+
+                // ✅ Usuario existente → generar token JWT de tu app
+                const appToken = jwt.sign(
+                    {
+                        id: usuario.id,
+                        correo: usuario.correo,
+                        nombre_usuario: usuario.nombre_usuario,
+                        foto_perfil: usuario.foto_perfil
+                    },
+                    JWT_SECRET,
+                    { expiresIn: '8h' }
+                );
+
+                return res.json({
+                    success: true,
+                    message: '¡Login con Google exitoso!',
+                    token: appToken,
+                    foto_perfil: usuario.foto_perfil
+                });
+            } else {
+                // ❌ Usuario no existe → debe crear contraseña
+                return res.json({
+                    success: false,
+                    requirePassword: true,
+                    correo,
+                    nombre_usuario,
+                    foto_perfil
+                });
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error en Google login:', error);
+        res.status(401).json({ error: 'Token inválido' });
+    }
+});
+
+// Ruta para crear contraseña después de Google login
+app.post('/crear-password', async (req, res) => {
+    try {
+        const { correo, nombre_usuario, password, foto_perfil } = req.body;
+
+        if (!correo || !nombre_usuario || !password) {
+            return res.status(400).json({ error: 'Faltan datos obligatorios' });
+        }
+
+        const existeQuery = 'SELECT * FROM usuarios WHERE correo = ?';
+        db.query(existeQuery, [correo], async (err, results) => {
+            if (err) {
+                console.error('❌ Error al verificar usuario existente:', err);
+                return res.status(500).json({ error: 'Error en el servidor' });
+            }
+
+            if (results.length > 0) {
+                return res.json({ success: false, message: 'Este correo ya está registrado.' });
+            }
+
+            const hash = await bcrypt.hash(password, 10);
+            const insertQuery = `
+                INSERT INTO usuarios (correo, nombre_usuario, contraseña, estado_id, foto_perfil)
+                VALUES (?, ?, ?, ?, ?)
+            `;
+
+            db.query(insertQuery, [correo, nombre_usuario, hash, 1, foto_perfil], (err, result) => {
+                if (err) {
+                    console.error('❌ Error al insertar usuario Google:', err);
+                    return res.status(500).json({ error: 'Error al registrar' });
+                }
+
+                // ✅ Generar token después de crear usuario
+                const token = jwt.sign(
+                    { id: result.insertId, correo, nombre_usuario, foto_perfil },
+                    JWT_SECRET,
+                    { expiresIn: '8h' }
+                );
+
+                return res.json({
+                    success: true,
+                    message: 'Usuario registrado con Google',
+                    token,
+                    foto_perfil
+                });
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error inesperado en crear-password:', error);
+        res.status(500).json({ error: 'Error interno' });
+    }
+});
+
+
 app.get('/usuario/:id/perfil', (req, res) => {
     const userId = req.params.id;
 
