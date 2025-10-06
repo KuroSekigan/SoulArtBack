@@ -15,7 +15,7 @@ import Stripe from "stripe";
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
