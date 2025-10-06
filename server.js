@@ -9,12 +9,13 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import streamifier from 'streamifier';
 import jwt from 'jsonwebtoken';
 import admin from './firebase.js';
-
+import Stripe from "stripe";
 
 // Inicialización
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
@@ -1181,6 +1182,50 @@ app.post('/notificaciones/vistas', async (req, res) => {
     });
 });
 
+//Stripe
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const { comicId } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1]; // "Bearer <token>"
+    
+    // 🔑 Decodificar el token para obtener el userId
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const userId = decoded.id;
+
+    const priceId = "price_1SF70LAMum07zANAbhd9xxLp";
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?success=true`,
+      cancel_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?cancel=true`,
+      metadata: { comicId, userId },
+    });
+
+    res.json({ id: session.id });
+  } catch (err) {
+    console.error("❌ Error creando sesión:", err);
+    res.status(500).json({ error: "No se pudo crear la sesión" });
+  }
+});
 
 // Puerto
 const PORT = 3001;
