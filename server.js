@@ -16,6 +16,7 @@ const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
