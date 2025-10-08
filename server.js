@@ -1228,6 +1228,89 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    
+    const sig = req.headers["stripe-signature"];
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+      console.error("❌ Error en webhook:", err.message);
+      return res.sendStatus(400);
+    }
+
+    // 📌 Manejo de eventos
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+
+        const comicId = session.metadata.comicId;
+        const userId = session.metadata.userId;
+        const subscriptionId = session.subscription;
+        const customerId = session.customer;
+
+        console.log("✅ Nueva suscripción creada:", subscriptionId);
+
+        try {
+          await db.query(
+            `INSERT INTO suscripciones 
+              (usuario_id, obra_id, stripe_subscription_id, stripe_customer_id, plan, estado, fecha_inicio) 
+             VALUES (?, ?, ?, ?, ?, 'activa', NOW())`,
+            [userId, comicId, subscriptionId, customerId, "mensual"]
+          );
+        } catch (dbErr) {
+          console.error("❌ Error guardando suscripción en BD:", dbErr);
+        }
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
+
+        console.log("💰 Pago exitoso de suscripción:", subscriptionId);
+
+        try {
+          await db.query(
+            `UPDATE suscripciones 
+             SET ultimo_pago = NOW(), proximo_pago = FROM_UNIXTIME(?) 
+             WHERE stripe_subscription_id = ?`,
+            [invoice.lines.data[0].period.end, subscriptionId]
+          );
+        } catch (dbErr) {
+          console.error("❌ Error actualizando pago en BD:", dbErr);
+        }
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object;
+        const subscriptionId = subscription.id;
+
+        console.log("⚠️ Suscripción cancelada:", subscriptionId);
+
+        try {
+          await db.query(
+            `UPDATE suscripciones 
+             SET estado = 'cancelada', fecha_fin = NOW() 
+             WHERE stripe_subscription_id = ?`,
+            [subscriptionId]
+          );
+        } catch (dbErr) {
+          console.error("❌ Error cancelando suscripción en BD:", dbErr);
+        }
+        break;
+      }
+
+      default:
+        console.log(`ℹ️ Evento no manejado: ${event.type}`);
+    }
+
+    res.sendStatus(200);
+  }
+);
+
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
