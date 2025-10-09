@@ -20,7 +20,13 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.originalUrl === "/webhook") {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 // Conexión a la base de datos
 const db = mysql.createConnection({
