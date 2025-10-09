@@ -1258,7 +1258,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
         console.log("✅ Nueva suscripción creada:", subscriptionId);
 
-        await db.query(
+        await db.promise().query(
           `INSERT INTO suscripciones 
             (usuario_id, obra_id, stripe_subscription_id, stripe_customer_id, plan, estado, fecha_inicio) 
            VALUES (?, ?, ?, ?, ?, 'activa', NOW())`,
@@ -1273,7 +1273,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
         console.log("💰 Pago exitoso de suscripción:", subscriptionId);
 
-        await db.query(
+        await db.promise().query(
           `UPDATE suscripciones 
            SET ultimo_pago = NOW(), proximo_pago = FROM_UNIXTIME(?) 
            WHERE stripe_subscription_id = ?`,
@@ -1288,7 +1288,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
         console.log("⚠️ Suscripción cancelada:", subscriptionId);
 
-        await db.query(
+        await db.promise().query(
           `UPDATE suscripciones 
            SET estado = 'cancelada', fecha_fin = NOW() 
            WHERE stripe_subscription_id = ?`,
