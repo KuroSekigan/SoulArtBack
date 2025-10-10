@@ -443,12 +443,13 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
         idioma_id,
         estado,
         tipo,
-        generos
+        generos,
+        tipo_acceso
     } = req.body;
 
     const autor_id = req.usuario.id;
 
-    if (!titulo || !descripcion || !autor_id || !idioma_id) {
+    if (!titulo || !descripcion || !autor_id || !idioma_id || !tipo_acceso) {
         return res.status(400).json({ error: 'Faltan campos obligatorios' });
     }
 
@@ -457,7 +458,7 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
     const sql = `
         INSERT INTO comics (
             titulo, descripcion, autor_id, idioma_id,
-            estado, tipo, generos,
+            estado, tipo, generos, tipo_acceso,
             publicacion, portada_url, fecha_creacion
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, 'solicitud', ?, NOW())
@@ -471,6 +472,7 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
         estado || 'en progreso',
         tipo || 'comic',
         generos || '',
+        tipo_acceso,
         portada_url
     ];
 
