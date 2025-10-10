@@ -461,7 +461,7 @@ app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => 
             estado, tipo, generos, tipo_acceso,
             publicacion, portada_url, fecha_creacion
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'solicitud', ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'solicitud', ?, NOW())
     `;
 
     const valores = [
