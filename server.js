@@ -1309,7 +1309,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
 // GET /suscripciones/validar/:comicId
 app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.usuario.id;
   const { comicId } = req.params;
 
   try {
