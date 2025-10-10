@@ -1308,6 +1308,32 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   }
 });
 
+// GET /suscripciones/validar/:comicId
+app.get("/suscripciones/validar/:comicId", authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const { comicId } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM suscripciones 
+       WHERE usuario_id = ? 
+       AND obra_id = ? 
+       AND estado = 'activa' 
+       LIMIT 1`,
+      [userId, comicId]
+    );
+
+    if (rows.length > 0) {
+      res.json({ acceso: true });
+    } else {
+      res.json({ acceso: false });
+    }
+  } catch (err) {
+    console.error("❌ Error validando suscripción:", err);
+    res.status(500).json({ acceso: false });
+  }
+});
+
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
