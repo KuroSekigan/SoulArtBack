@@ -1313,7 +1313,7 @@ app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   const { comicId } = req.params;
 
   try {
-    const [rows] = await db.query(
+    const [rows] = await db.promise().query(
       `SELECT * FROM suscripciones 
        WHERE usuario_id = ? 
        AND obra_id = ? 
