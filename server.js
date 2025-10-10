@@ -301,7 +301,6 @@ app.post('/crear-password', async (req, res) => {
     }
 });
 
-
 app.get('/usuario/:id/perfil', (req, res) => {
     const userId = req.params.id;
 
@@ -1309,7 +1308,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 });
 
 // GET /suscripciones/validar/:comicId
-app.get("/suscripciones/validar/:comicId", authMiddleware, async (req, res) => {
+app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   const userId = req.user.id;
   const { comicId } = req.params;
 
