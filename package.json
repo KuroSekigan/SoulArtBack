@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/KuroSekigan/SoulArtBack#readme",
   "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "@stripe/react-stripe-js": "^5.0.0",
     "@stripe/stripe-js": "^8.0.0",
     "bcryptjs": "^3.0.2",
