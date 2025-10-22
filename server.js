@@ -1293,6 +1293,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object;
+        console.log("📄 INVOICE DATA:", JSON.stringify(invoice, null, 2));
         const subscriptionId = invoice.subscription;
 
         if (!subscriptionId) {
