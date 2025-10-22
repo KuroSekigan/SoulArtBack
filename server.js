@@ -1249,6 +1249,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
   try {
     switch (event.type) {
+      // ✅ NUEVA SUSCRIPCIÓN
       case "checkout.session.completed": {
         const session = event.data.object;
         const comicId = session.metadata.comicId;
@@ -1265,7 +1266,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
           [userId, comicId, subscriptionId, customerId, "mensual"]
         );
 
-        // 🔎 Revisamos si hay pagos pendientes de esta suscripción
+        // 🔎 Si había pagos pendientes antes de que la suscripción existiera
         const [pendiente] = await db.promise().query(
           `SELECT * FROM pagos_pendientes WHERE stripe_subscription_id = ?`,
           [subscriptionId]
@@ -1291,22 +1292,30 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         break;
       }
 
+      // ✅ PAGO EXITOSO
       case "invoice.payment_succeeded": {
         const invoice = event.data.object;
-        console.log("📄 INVOICE DATA:", JSON.stringify(invoice, null, 2));
-        const subscriptionId = invoice.subscription;
+
+        // 🔍 Buscar el ID de suscripción en ambos lugares posibles
+        const subscriptionId =
+          invoice.subscription ||
+          invoice.lines?.data?.[0]?.parent?.subscription_item_details?.subscription;
 
         if (!subscriptionId) {
           console.log("⚠️ Pago sin subscriptionId, ignorando.");
           break;
         }
 
-        const ultimoPago = new Date(invoice.status_transitions.paid_at * 1000);
-        const proximoPago = new Date(invoice.lines.data[0].period.end * 1000);
+        // Fechas de pago y periodo
+        const ultimoPago = invoice.status_transitions?.paid_at
+          ? new Date(invoice.status_transitions.paid_at * 1000)
+          : new Date();
+        const proximoPago = new Date(invoice.lines?.data?.[0]?.period?.end * 1000 || Date.now());
         const fechaFin = new Date(proximoPago.getTime());
 
         console.log("💰 Pago exitoso de suscripción:", subscriptionId);
 
+        // 🔎 Verificar si la suscripción ya está registrada
         const [sub] = await db.promise().query(
           `SELECT * FROM suscripciones WHERE stripe_subscription_id = ?`,
           [subscriptionId]
@@ -1321,6 +1330,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
             [subscriptionId, ultimoPago, proximoPago, fechaFin, JSON.stringify(invoice)]
           );
         } else {
+          // 🧾 Actualizar suscripción con las nuevas fechas
           await db.promise().query(
             `UPDATE suscripciones
              SET ultimo_pago = ?, proximo_pago = ?, fecha_fin = ?
@@ -1332,6 +1342,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         break;
       }
 
+      // ⚠️ SUSCRIPCIÓN CANCELADA
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
         const subscriptionId = subscription.id;
@@ -1352,8 +1363,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     }
 
     res.sendStatus(200);
-  } catch (err) {
-    console.error("❌ Error al procesar evento:", err);
+  } catch (dbErr) {
+    console.error("❌ Error al procesar evento:", dbErr);
     res.sendStatus(500);
   }
 });
