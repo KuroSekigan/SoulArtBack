@@ -1251,7 +1251,6 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-
         const comicId = session.metadata.comicId;
         const userId = session.metadata.userId;
         const subscriptionId = session.subscription;
@@ -1265,6 +1264,30 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
            VALUES (?, ?, ?, ?, ?, 'activa', NOW())`,
           [userId, comicId, subscriptionId, customerId, "mensual"]
         );
+
+        // 🔎 Revisamos si hay pagos pendientes de esta suscripción
+        const [pendiente] = await db.promise().query(
+          `SELECT * FROM pagos_pendientes WHERE stripe_subscription_id = ?`,
+          [subscriptionId]
+        );
+
+        if (pendiente.length > 0) {
+          const p = pendiente[0];
+          console.log("📦 Aplicando pago pendiente para:", subscriptionId);
+
+          await db.promise().query(
+            `UPDATE suscripciones 
+             SET ultimo_pago = ?, proximo_pago = ?, fecha_fin = ?
+             WHERE stripe_subscription_id = ?`,
+            [p.ultimo_pago, p.proximo_pago, p.fecha_fin, subscriptionId]
+          );
+
+          await db.promise().query(
+            `DELETE FROM pagos_pendientes WHERE id = ?`,
+            [p.id]
+          );
+        }
+
         break;
       }
 
@@ -1272,14 +1295,39 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
 
+        if (!subscriptionId) {
+          console.log("⚠️ Pago sin subscriptionId, ignorando.");
+          break;
+        }
+
+        const ultimoPago = new Date(invoice.status_transitions.paid_at * 1000);
+        const proximoPago = new Date(invoice.lines.data[0].period.end * 1000);
+        const fechaFin = new Date(proximoPago.getTime());
+
         console.log("💰 Pago exitoso de suscripción:", subscriptionId);
 
-        await db.promise().query(
-          `UPDATE suscripciones 
-           SET ultimo_pago = NOW(), proximo_pago = FROM_UNIXTIME(?) 
-           WHERE stripe_subscription_id = ?`,
-          [invoice.lines.data[0].period.end, subscriptionId]
+        const [sub] = await db.promise().query(
+          `SELECT * FROM suscripciones WHERE stripe_subscription_id = ?`,
+          [subscriptionId]
         );
+
+        if (sub.length === 0) {
+          console.log("🕓 Suscripción aún no creada, guardando pago pendiente...");
+          await db.promise().query(
+            `INSERT INTO pagos_pendientes 
+              (stripe_subscription_id, ultimo_pago, proximo_pago, fecha_fin, datos)
+             VALUES (?, ?, ?, ?, ?)`,
+            [subscriptionId, ultimoPago, proximoPago, fechaFin, JSON.stringify(invoice)]
+          );
+        } else {
+          await db.promise().query(
+            `UPDATE suscripciones
+             SET ultimo_pago = ?, proximo_pago = ?, fecha_fin = ?
+             WHERE stripe_subscription_id = ?`,
+            [ultimoPago, proximoPago, fechaFin, subscriptionId]
+          );
+        }
+
         break;
       }
 
@@ -1303,8 +1351,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     }
 
     res.sendStatus(200);
-  } catch (dbErr) {
-    console.error("❌ Error al procesar evento:", dbErr);
+  } catch (err) {
+    console.error("❌ Error al procesar evento:", err);
     res.sendStatus(500);
   }
 });
