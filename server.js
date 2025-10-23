@@ -17,6 +17,9 @@ const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
+const PAYPAL_API = process.env.PAYPAL_API;
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
