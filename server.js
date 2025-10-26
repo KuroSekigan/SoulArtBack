@@ -20,6 +20,7 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 const PAYPAL_API = process.env.PAYPAL_API;
+const PAYPAL_PLAN_ID = process.env.PAYPAL_PLAN_ID; 
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
@@ -1383,18 +1384,20 @@ app.post("/create-paypal-subscription", async (req, res) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 
-    // 1️⃣ Obtener token de acceso de PayPal
-    const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString("base64");
+    // 🪙 Generar access token de PayPal
+    const basicAuth = Buffer.from(
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
+    ).toString("base64");
 
     const tokenRes = await axios.post(
       `${process.env.PAYPAL_API}/v1/oauth2/token`,
       "grant_type=client_credentials",
       {
         headers: {
-          Authorization: `Basic ${auth}`,
+          Authorization: `Basic ${basicAuth}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
       }
@@ -1402,14 +1405,16 @@ app.post("/create-paypal-subscription", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // 2️⃣ Crear suscripción
+    // 💰 Crear la suscripción
     const subscriptionRes = await axios.post(
       `${process.env.PAYPAL_API}/v1/billing/subscriptions`,
       {
-        plan_id: "P-XXXXXXX", // <-- el ID del plan mensual que crearás en PayPal
-        custom_id: `${comicId}_${userId}`, // útil para vincularlo a tu BD
+        plan_id: process.env.PAYPAL_PLAN_ID, // ⚠️ Define tu plan mensual aquí
+        custom_id: `${comicId}_${userId}`,
         application_context: {
           brand_name: "SoulArt",
+          locale: "es-MX",
+          shipping_preference: "NO_SHIPPING",
           user_action: "SUBSCRIBE_NOW",
           return_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_success=true`,
           cancel_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_cancel=true`,
@@ -1423,7 +1428,10 @@ app.post("/create-paypal-subscription", async (req, res) => {
       }
     );
 
-    const approvalUrl = subscriptionRes.data.links.find(l => l.rel === "approve").href;
+    const approvalUrl = subscriptionRes.data.links.find(
+      (link) => link.rel === "approve"
+    ).href;
+
     res.json({ url: approvalUrl });
   } catch (err) {
     console.error("❌ Error creando suscripción PayPal:", err.response?.data || err.message);
@@ -1436,7 +1444,7 @@ app.post("/paypal/webhook", async (req, res) => {
     const event = req.body;
 
     switch (event.event_type) {
-      // ✅ NUEVA SUSCRIPCIÓN ACTIVADA
+      // ✅ Suscripción activada
       case "BILLING.SUBSCRIPTION.ACTIVATED": {
         const subscription = event.resource;
         const [comicId, userId] = subscription.custom_id.split("_");
@@ -1446,14 +1454,15 @@ app.post("/paypal/webhook", async (req, res) => {
         await db.promise().query(
           `INSERT INTO suscripciones 
             (usuario_id, obra_id, paypal_subscription_id, plan, estado, fecha_inicio)
-           VALUES (?, ?, ?, ?, 'activa', NOW())`,
+           VALUES (?, ?, ?, ?, 'activa', NOW())
+           ON DUPLICATE KEY UPDATE estado='activa', fecha_inicio=NOW()`,
           [userId, comicId, subscription.id, "mensual"]
         );
 
         break;
       }
 
-      // 💰 PAGO EXITOSO
+      // 💰 Pago exitoso
       case "PAYMENT.SALE.COMPLETED": {
         const payment = event.resource;
         const subscriptionId = payment.billing_agreement_id;
@@ -1479,7 +1488,7 @@ app.post("/paypal/webhook", async (req, res) => {
         break;
       }
 
-      // ⚠️ SUSCRIPCIÓN CANCELADA
+      // ⚠️ Cancelación
       case "BILLING.SUBSCRIPTION.CANCELLED": {
         const subscription = event.resource;
 
@@ -1501,7 +1510,7 @@ app.post("/paypal/webhook", async (req, res) => {
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Error procesando webhook PayPal:", err);
+    console.error("❌ Error procesando webhook PayPal:", err.response?.data || err.message);
     res.sendStatus(500);
   }
 });
