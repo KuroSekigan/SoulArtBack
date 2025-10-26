@@ -1372,6 +1372,140 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   }
 });
 
+//Paypal
+app.post("/create-paypal-subscription", async (req, res) => {
+  try {
+    const { comicId } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.id;
+
+    // 1️⃣ Obtener token de acceso de PayPal
+    const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString("base64");
+
+    const tokenRes = await axios.post(
+      `${process.env.PAYPAL_API}/v1/oauth2/token`,
+      "grant_type=client_credentials",
+      {
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const accessToken = tokenRes.data.access_token;
+
+    // 2️⃣ Crear suscripción
+    const subscriptionRes = await axios.post(
+      `${process.env.PAYPAL_API}/v1/billing/subscriptions`,
+      {
+        plan_id: "P-XXXXXXX", // <-- el ID del plan mensual que crearás en PayPal
+        custom_id: `${comicId}_${userId}`, // útil para vincularlo a tu BD
+        application_context: {
+          brand_name: "SoulArt",
+          user_action: "SUBSCRIBE_NOW",
+          return_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_success=true`,
+          cancel_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_cancel=true`,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const approvalUrl = subscriptionRes.data.links.find(l => l.rel === "approve").href;
+    res.json({ url: approvalUrl });
+  } catch (err) {
+    console.error("❌ Error creando suscripción PayPal:", err.response?.data || err.message);
+    res.status(500).json({ error: "No se pudo crear la suscripción con PayPal" });
+  }
+});
+
+app.post("/paypal/webhook", async (req, res) => {
+  try {
+    const event = req.body;
+
+    switch (event.event_type) {
+      // ✅ NUEVA SUSCRIPCIÓN ACTIVADA
+      case "BILLING.SUBSCRIPTION.ACTIVATED": {
+        const subscription = event.resource;
+        const [comicId, userId] = subscription.custom_id.split("_");
+
+        console.log("✅ Suscripción PayPal activada:", subscription.id);
+
+        await db.promise().query(
+          `INSERT INTO suscripciones 
+            (usuario_id, obra_id, paypal_subscription_id, plan, estado, fecha_inicio)
+           VALUES (?, ?, ?, ?, 'activa', NOW())`,
+          [userId, comicId, subscription.id, "mensual"]
+        );
+
+        break;
+      }
+
+      // 💰 PAGO EXITOSO
+      case "PAYMENT.SALE.COMPLETED": {
+        const payment = event.resource;
+        const subscriptionId = payment.billing_agreement_id;
+
+        if (!subscriptionId) {
+          console.log("⚠️ Pago sin subscriptionId, ignorando.");
+          break;
+        }
+
+        const ultimoPago = new Date(payment.create_time);
+        const proximoPago = new Date();
+        proximoPago.setMonth(proximoPago.getMonth() + 1);
+
+        console.log("💰 Pago PayPal exitoso:", subscriptionId);
+
+        await db.promise().query(
+          `UPDATE suscripciones 
+           SET ultimo_pago = ?, proximo_pago = ?, fecha_fin = ?
+           WHERE paypal_subscription_id = ?`,
+          [ultimoPago, proximoPago, proximoPago, subscriptionId]
+        );
+
+        break;
+      }
+
+      // ⚠️ SUSCRIPCIÓN CANCELADA
+      case "BILLING.SUBSCRIPTION.CANCELLED": {
+        const subscription = event.resource;
+
+        console.log("⚠️ Suscripción PayPal cancelada:", subscription.id);
+
+        await db.promise().query(
+          `UPDATE suscripciones 
+           SET estado = 'cancelada', fecha_fin = NOW()
+           WHERE paypal_subscription_id = ?`,
+          [subscription.id]
+        );
+
+        break;
+      }
+
+      default:
+        console.log(`ℹ️ Evento PayPal no manejado: ${event.event_type}`);
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Error procesando webhook PayPal:", err);
+    res.sendStatus(500);
+  }
+});
+
 // GET /suscripciones/validar/:comicId
 app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   const userId = req.usuario.id;
