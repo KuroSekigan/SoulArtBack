@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import admin from './firebase.js';
 import Stripe from "stripe";
 import dotenv from "dotenv";
+import axios from "axios";
 
 // Inicialización
 const app = express();
