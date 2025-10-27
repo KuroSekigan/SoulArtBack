@@ -27,8 +27,8 @@ async function crearPlanMensual() {
     const productRes = await axios.post(
       `${process.env.PAYPAL_API}/v1/catalogs/products`,
       {
-        name: "Suscripción Mensual SoulArt",
-        description: "Acceso a cómics premium y exclusivos cada mes",
+        name: "Suscripción Mensual al cómic",
+        description: "Acceso al cómic premium cada mes",
         type: "SERVICE",
         category: "SOFTWARE",
       },
@@ -48,8 +48,8 @@ async function crearPlanMensual() {
       `${process.env.PAYPAL_API}/v1/billing/plans`,
       {
         product_id: productId,
-        name: "Plan mensual SoulArt",
-        description: "Acceso mensual a contenido premium de SoulArt",
+        name: "Plan mensual",
+        description: "Acceso mensual a contenido premium del cómic",
         status: "ACTIVE",
         billing_cycles: [
           {
