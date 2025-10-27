@@ -23,9 +23,6 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 const PAYPAL_API = process.env.PAYPAL_API;
 const PAYPAL_PLAN_ID = process.env.PAYPAL_PLAN_ID; 
-console.log("🧩 PAYPAL_CLIENT_ID:", process.env.PAYPAL_CLIENT_ID);
-console.log("🧩 PAYPAL_SECRET:", process.env.PAYPAL_SECRET ? "✅ Cargado" : "❌ Vacío");
-
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
@@ -1389,7 +1386,7 @@ app.post("/create-paypal-subscription", async (req, res) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.id;
 
     // 🔑 Generar access token de PayPal
