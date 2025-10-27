@@ -1387,7 +1387,7 @@ app.post("/create-paypal-subscription", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 
-    // 🪙 Generar access token de PayPal
+    // 🔑 Generar access token de PayPal
     const basicAuth = Buffer.from(
       `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
     ).toString("base64");
@@ -1405,11 +1405,11 @@ app.post("/create-paypal-subscription", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // 💰 Crear la suscripción
+    // 💳 Crear la suscripción
     const subscriptionRes = await axios.post(
       `${process.env.PAYPAL_API}/v1/billing/subscriptions`,
       {
-        plan_id: process.env.PAYPAL_PLAN_ID, // ⚠️ Define tu plan mensual aquí
+        plan_id: process.env.PAYPAL_PLAN_ID, // ✅ Usa tu plan mensual aquí
         custom_id: `${comicId}_${userId}`,
         application_context: {
           brand_name: "SoulArt",
@@ -1439,12 +1439,16 @@ app.post("/create-paypal-subscription", async (req, res) => {
   }
 });
 
-app.post("/paypal/webhook", async (req, res) => {
+
+// 🧩 Webhook PayPal
+app.post("/paypal/webhook", express.json({ type: "application/json" }), async (req, res) => {
   try {
     const event = req.body;
 
+    console.log(`📦 Evento recibido de PayPal: ${event.event_type}`);
+
     switch (event.event_type) {
-      // ✅ Suscripción activada
+      // ✅ SUSCRIPCIÓN ACTIVADA
       case "BILLING.SUBSCRIPTION.ACTIVATED": {
         const subscription = event.resource;
         const [comicId, userId] = subscription.custom_id.split("_");
@@ -1462,7 +1466,7 @@ app.post("/paypal/webhook", async (req, res) => {
         break;
       }
 
-      // 💰 Pago exitoso
+      // 💰 PAGO EXITOSO
       case "PAYMENT.SALE.COMPLETED": {
         const payment = event.resource;
         const subscriptionId = payment.billing_agreement_id;
@@ -1488,7 +1492,7 @@ app.post("/paypal/webhook", async (req, res) => {
         break;
       }
 
-      // ⚠️ Cancelación
+      // ⚠️ SUSCRIPCIÓN CANCELADA
       case "BILLING.SUBSCRIPTION.CANCELLED": {
         const subscription = event.resource;
 
