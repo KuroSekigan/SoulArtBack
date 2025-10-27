@@ -10,11 +10,13 @@ import streamifier from 'streamifier';
 import jwt from 'jsonwebtoken';
 import admin from './firebase.js';
 import Stripe from "stripe";
+import dotenv from "dotenv";
 
 // Inicialización
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
+dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
