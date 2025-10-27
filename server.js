@@ -1440,6 +1440,7 @@ app.post("/create-paypal-subscription", async (req, res) => {
     res.json({ url: approvalUrl });
   } catch (err) {
     console.error("❌ Error creando suscripción PayPal:", err.response?.data || err.message);
+    console.error("🔍 Stack trace:", err.stack);
     res.status(500).json({ error: "No se pudo crear la suscripción con PayPal" });
   }
 });
