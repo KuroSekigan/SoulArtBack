@@ -23,6 +23,7 @@
     "@paypal/checkout-server-sdk": "^1.0.3",
     "@stripe/react-stripe-js": "^5.0.0",
     "@stripe/stripe-js": "^8.0.0",
+    "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
