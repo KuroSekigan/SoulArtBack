@@ -521,6 +521,20 @@ app.get('/comic/:id', (req, res) => {
     });
 });
 
+app.put("/comic/:id/vistas", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.promise().query(
+      "UPDATE comics SET vistas = vistas + 1 WHERE id = ?",
+      [id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Error al actualizar vistas:", err);
+    res.status(500).json({ success: false });
+  }
+});
+
 app.get('/favoritos/:id_usuario', (req, res) => {
     const id_usuario = req.params.id_usuario;
 
