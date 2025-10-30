@@ -441,6 +441,56 @@ app.get('/comics/publicados', (req, res) => {
     });
 });
 
+// OBRAS MÁS GUSTADAS
+app.get('/comics/mas-gustados', (req, res) => {
+    const sql = `
+        SELECT 
+            c.*, 
+            u.nombre_usuario AS autor,
+            COUNT(r.id) AS likes
+        FROM comics c
+        JOIN usuarios u ON c.autor_id = u.id
+        LEFT JOIN reacciones_comics r 
+            ON c.id = r.id_comic AND r.tipo = 'like'
+        WHERE c.publicacion = 'publicado'
+        GROUP BY c.id
+        ORDER BY likes DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics más gustados:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
+// OBRAS MÁS LEÍDAS
+app.get('/comics/mas-leidos', (req, res) => {
+    const sql = `
+        SELECT 
+            c.*, 
+            u.nombre_usuario AS autor
+        FROM comics c
+        JOIN usuarios u ON c.autor_id = u.id
+        WHERE c.publicacion = 'publicado'
+        ORDER BY c.vistas DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics más leídos:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
 const URL_COMIC_DEFAULT = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753606561/preview_ow9ltw.png';
 
 app.post('/comic', verificarToken, uploadComic.single('portada'), (req, res) => {
