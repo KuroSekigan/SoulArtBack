@@ -1587,6 +1587,40 @@ app.post("/paypal/webhook", express.json({ type: "application/json" }), async (r
   }
 });
 
+// OBTENER SUSCRIPCIONES DEL USUARIO
+app.get("/suscripciones/:usuario_id", (req, res) => {
+    const usuario_id = req.params.usuario_id;
+
+    const query = `
+        SELECT 
+            s.id,
+            s.usuario_id,
+            s.obra_id,
+            s.stripe_subscription_id,
+            s.stripe_customer_id,
+            s.plan,
+            s.estado,
+            s.fecha_inicio,
+            s.fecha_fin,
+            s.ultimo_pago,
+            s.proximo_pago,
+            s.paypal_subscription_id,
+            o.titulo AS comic_titulo
+        FROM suscripciones s
+        LEFT JOIN obras o ON s.obra_id = o.id
+        WHERE s.usuario_id = ?;
+    `;
+
+    connection.query(query, [usuario_id], (err, results) => {
+        if (err) {
+            console.error("Error al obtener suscripciones:", err);
+            return res.status(500).json({ success: false, message: "Error del servidor" });
+        }
+
+        return res.json({ success: true, suscripciones: results });
+    });
+});
+
 // GET /suscripciones/validar/:comicId
 app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   const userId = req.usuario.id;
