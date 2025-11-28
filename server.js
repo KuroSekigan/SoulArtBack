@@ -1588,7 +1588,7 @@ app.post("/paypal/webhook", express.json({ type: "application/json" }), async (r
 });
 
 // OBTENER SUSCRIPCIONES DEL USUARIO
-app.get("/suscripciones/:usuario_id", (req, res) => {
+app.get("/suscripciones/:usuario_id", async (req, res) => {
     const usuario_id = req.params.usuario_id;
 
     const query = `
@@ -1611,14 +1611,21 @@ app.get("/suscripciones/:usuario_id", (req, res) => {
         WHERE s.usuario_id = ?;
     `;
 
-    connection.query(query, [usuario_id], (err, results) => {
-        if (err) {
-            console.error("Error al obtener suscripciones:", err);
-            return res.status(500).json({ success: false, message: "Error del servidor" });
-        }
+    try {
+        const [results] = await db.promise().query(query, [usuario_id]);
 
-        return res.json({ success: true, suscripciones: results });
-    });
+        return res.json({
+            success: true,
+            suscripciones: results
+        });
+
+    } catch (err) {
+        console.error("Error al obtener suscripciones:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Error del servidor"
+        });
+    }
 });
 
 // GET /suscripciones/validar/:comicId
