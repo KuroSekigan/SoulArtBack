@@ -414,7 +414,7 @@ app.get('/usuario/:id/comics', (req, res) => {
 
 // Obtener todos los cómics que estén en estado "publicado"
 app.get('/comics/publicados', (req, res) => {
-    const { q } = req.query;
+    const { q, estado, tipo, genero } = req.query;
 
     let sql = `
         SELECT comics.*, usuarios.nombre_usuario AS autor
@@ -422,15 +422,37 @@ app.get('/comics/publicados', (req, res) => {
         JOIN usuarios ON comics.autor_id = usuarios.id
         WHERE comics.publicacion = 'publicado'
     `;
+
     let params = [];
 
+    // 🔍 FILTRO DE BÚSQUEDA
     if (q) {
         sql += ` AND (comics.titulo LIKE ? OR usuarios.nombre_usuario LIKE ?)`;
         params.push(`%${q}%`, `%${q}%`);
     }
 
+    // 🟦 FILTRO DE ESTADO
+    if (estado) {
+        sql += ` AND comics.estado = ?`;
+        params.push(estado);
+    }
+
+    // 🟥 FILTRO DE TIPO
+    if (tipo) {
+        sql += ` AND comics.tipo = ?`;
+        params.push(tipo);
+    }
+
+    // 🟩 FILTRO DE GÉNERO
+    if (generos) {
+        sql += ` AND comics.generos = ?`;
+        params.push(generos);
+    }
+
+    // ORDENAMIENTO
     sql += ` ORDER BY comics.fecha_creacion DESC`;
 
+    // ✔ Ejecutar consulta
     db.query(sql, params, (err, results) => {
         if (err) {
             console.error('❌ Error al obtener cómics publicados:', err);
