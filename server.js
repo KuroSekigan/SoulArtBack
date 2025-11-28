@@ -1605,9 +1605,9 @@ app.get("/suscripciones/:usuario_id", (req, res) => {
             s.ultimo_pago,
             s.proximo_pago,
             s.paypal_subscription_id,
-            o.titulo AS comic_titulo
+            c.titulo AS comic_titulo
         FROM suscripciones s
-        LEFT JOIN obras o ON s.obra_id = o.id
+        LEFT JOIN comics o ON s.obra_id = c.id
         WHERE s.usuario_id = ?;
     `;
 
