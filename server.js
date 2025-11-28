@@ -414,7 +414,7 @@ app.get('/usuario/:id/comics', (req, res) => {
 
 // Obtener todos los cómics que estén en estado "publicado"
 app.get('/comics/publicados', (req, res) => {
-    const { q, estado, tipo, genero } = req.query;
+    const { q, estado, tipo, generos } = req.query;
 
     let sql = `
         SELECT comics.*, usuarios.nombre_usuario AS autor
