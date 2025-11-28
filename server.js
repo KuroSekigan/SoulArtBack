@@ -1587,6 +1587,89 @@ app.post("/paypal/webhook", express.json({ type: "application/json" }), async (r
   }
 });
 
+// ❌ CANCELAR SUSCRIPCIÓN (Stripe o PayPal)
+app.post("/cancelar-suscripcion/:id", verificarToken, async (req, res) => {
+  const subId = req.params.id;
+  const userId = req.usuario.id;
+
+  try {
+    // 1️⃣ Buscar suscripción en la base de datos
+    const [rows] = await db.promise().query(
+      `SELECT * FROM suscripciones WHERE id = ? AND usuario_id = ? LIMIT 1`,
+      [subId, userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Suscripción no encontrada" });
+    }
+
+    const sus = rows[0];
+
+    // ---------------------------------------------------------
+    // 🚀 CANCELAR EN STRIPE
+    // ---------------------------------------------------------
+    if (sus.stripe_subscription_id) {
+      console.log("🔴 Cancelando en STRIPE:", sus.stripe_subscription_id);
+
+      await stripe.subscriptions.update(sus.stripe_subscription_id, {
+        cancel_at_period_end: true, // Cancela al finalizar el mes pagado
+      });
+    }
+
+    // ---------------------------------------------------------
+    // 🚀 CANCELAR EN PAYPAL
+    // ---------------------------------------------------------
+    if (sus.paypal_subscription_id) {
+      console.log("🔴 Cancelando en PAYPAL:", sus.paypal_subscription_id);
+
+      // Obtener access token PayPal
+      const basicAuth = Buffer.from(
+        `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
+      ).toString("base64");
+
+      const tokenRes = await axios.post(
+        `${process.env.PAYPAL_API}/v1/oauth2/token`,
+        "grant_type=client_credentials",
+        {
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+
+      const accessToken = tokenRes.data.access_token;
+
+      // Cancelar suscripción PayPal
+      await axios.post(
+        `${process.env.PAYPAL_API}/v1/billing/subscriptions/${sus.paypal_subscription_id}/cancel`,
+        {
+          reason: "Cancelado por el usuario",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    // ---------------------------------------------------------
+    // 🗂️ 3. Actualizar base de datos
+    // ---------------------------------------------------------
+    await db.promise().query(
+      `UPDATE suscripciones SET estado = 'cancelada' WHERE id = ?`,
+      [subId]
+    );
+
+    res.json({ success: true, message: "Suscripción cancelada correctamente" });
+  } catch (error) {
+    console.error("❌ Error cancelando suscripción:", error);
+    res.status(500).json({ success: false, message: "Error al cancelar suscripción" });
+  }
+});
+
 // OBTENER SUSCRIPCIONES DEL USUARIO
 app.get("/suscripciones/:usuario_id", async (req, res) => {
     const usuario_id = req.params.usuario_id;
