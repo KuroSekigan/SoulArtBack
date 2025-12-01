@@ -172,7 +172,7 @@ app.post('/login', (req, res) => {
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
                         foto_perfil: usuario.foto_perfil,
-                        tipo: usuario.tipo // <--- AGREGADO TAMBIÉN AL TOKEN (OPCIONAL PERO ÚTIL)
+                        rol: usuario.rol // <--- AGREGADO TAMBIÉN AL TOKEN (OPCIONAL PERO ÚTIL)
                     },
                     JWT_SECRET,
                     { expiresIn: '8h' }
@@ -184,7 +184,7 @@ app.post('/login', (req, res) => {
                     message: '¡Login exitoso!', 
                     token, 
                     foto_perfil: usuario.foto_perfil,
-                    tipo: usuario.tipo // <--- ¡AHORA SÍ LO ENVIAMOS AL FRONT!
+                    rol: usuario.tipo // <--- ¡AHORA SÍ LO ENVIAMOS AL FRONT!
                 }); 
                 
             } else {
