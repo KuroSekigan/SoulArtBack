@@ -1770,6 +1770,49 @@ app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   }
 });
 
+
+//Tablas del dashboard
+// 1. Obtener todos los usuarios
+app.get('/usuarios', (req, res) => {
+    const query = 'SELECT * FROM usuarios';
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener usuarios:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Editar usuario
+app.put('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+    const { nombre_usuario, correo, biografia } = req.body;
+
+    const query = 'UPDATE usuarios SET nombre_usuario = ?, correo = ?, biografia = ? WHERE id = ?';
+    db.query(query, [nombre_usuario, correo, biografia, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar usuario:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Usuario actualizado exitosamente');
+    });
+});
+
+// 3. Eliminar usuario
+app.delete('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM usuarios WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar usuario:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Usuario eliminado exitosamente');
+    });
+});
+
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
