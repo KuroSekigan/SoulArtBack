@@ -1813,6 +1813,65 @@ app.delete('/usuarios/:id', (req, res) => {
     });
 });
 
+// ==========================================
+// 📚 CRUD DE CÓMICS (Dashboard Admin)
+// ==========================================
+
+// 1. Obtener todos los cómics
+app.get('/comics', (req, res) => {
+    // Ordenamos por ID descendente para ver los nuevos primero
+    const query = 'SELECT * FROM comics ORDER BY id DESC'; 
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener cómics:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Crear cómic (Admin manual)
+app.post('/comics', (req, res) => {
+    const { titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion } = req.body;
+    const query = 'INSERT INTO comics (titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    
+    db.query(query, [titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion], (err, result) => {
+        if (err) {
+            console.error('Error al crear cómic:', err);
+            return res.status(500).send('Error al crear');
+        }
+        res.json({ id: result.insertId, ...req.body });
+    });
+});
+
+// 3. Editar cómic
+app.put('/comics/:id', (req, res) => {
+    const { id } = req.params;
+    const { titulo, descripcion, estado, tipo, generos, publicacion } = req.body;
+
+    const query = 'UPDATE comics SET titulo = ?, descripcion = ?, estado = ?, tipo = ?, generos = ?, publicacion = ? WHERE id = ?';
+    db.query(query, [titulo, descripcion, estado, tipo, generos, publicacion, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar cómic:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Cómic actualizado exitosamente');
+    });
+});
+
+// 4. Eliminar cómic
+app.delete('/comics/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM comics WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar cómic:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Cómic eliminado exitosamente');
+    });
+});
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
