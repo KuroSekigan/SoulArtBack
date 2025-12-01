@@ -207,14 +207,13 @@ app.post('/google-login', async (req, res) => {
             return res.status(400).json({ error: 'Token de Google requerido' });
         }
 
-        // ✅ Verificar token con Firebase Admin
+        // Verificar token con Firebase Admin
         const decoded = await admin.auth().verifyIdToken(token);
 
         const correo = decoded.email;
-        const nombre_usuario = decoded.name || correo.split('@')[0]; // fallback si no hay name
+        const nombre_usuario = decoded.name || correo.split('@')[0];
         const foto_perfil = decoded.picture || 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753396083/default_profile_htx1ge.png';
 
-        // 🔍 Revisar si el usuario ya existe
         const query = 'SELECT * FROM usuarios WHERE correo = ?';
         db.query(query, [correo], async (err, results) => {
             if (err) {
@@ -222,6 +221,7 @@ app.post('/google-login', async (req, res) => {
                 return res.status(500).json({ error: 'Error en el servidor' });
             }
 
+            // CASO A: El usuario YA existe en la base de datos
             if (results.length > 0) {
                 const usuario = results[0];
 
@@ -229,13 +229,14 @@ app.post('/google-login', async (req, res) => {
                     return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
                 }
 
-                // ✅ Usuario existente → generar token JWT de tu app
+                // ✅ CORRECCIÓN 2: Incluir 'rol' en el token de Google
                 const appToken = jwt.sign(
                     {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.tipo // <--- ¡AQUÍ FALTABA ESTO!
                     },
                     JWT_SECRET,
                     { expiresIn: '8h' }
@@ -245,10 +246,11 @@ app.post('/google-login', async (req, res) => {
                     success: true,
                     message: '¡Login con Google exitoso!',
                     token: appToken,
-                    foto_perfil: usuario.foto_perfil
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.tipo // <--- ¡Y AQUÍ TAMBIÉN!
                 });
             } else {
-                // ❌ Usuario no existe → debe crear contraseña
+                // CASO B: Usuario Nuevo (No existe)
                 return res.json({
                     success: false,
                     requirePassword: true,
