@@ -171,13 +171,22 @@ app.post('/login', (req, res) => {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.rol // <--- AGREGADO TAMBIÉN AL TOKEN (OPCIONAL PERO ÚTIL)
                     },
                     JWT_SECRET,
-                    { expiresIn: '8h' } // el token durará 2 horas
+                    { expiresIn: '8h' }
                 );
 
-                res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
+                // 👇 AQUÍ ESTÁ EL CAMBIO IMPORTANTE 👇
+                res.json({ 
+                    success: true, 
+                    message: '¡Login exitoso!', 
+                    token, 
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.rol // <--- ¡AHORA SÍ LO ENVIAMOS AL FRONT!
+                }); 
+                
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
