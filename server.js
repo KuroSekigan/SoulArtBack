@@ -1279,6 +1279,29 @@ app.post('/comentarios', (req, res) => {
     });
 });
 
+app.post('/reportar', verificarToken, (req, res) => {
+    const { tipo, id_objetivo, motivo } = req.body;
+    const id_usuario = req.user.id;
+
+    if (!tipo || !id_objetivo || !motivo) {
+        return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    const sql = `
+        INSERT INTO reportes (id_usuario, tipo, id_objetivo, motivo)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    db.query(sql, [id_usuario, tipo, id_objetivo, motivo], (err) => {
+        if (err) {
+            console.error("❌ Error al crear reporte:", err);
+            return res.status(500).json({ error: "Error al reportar" });
+        }
+
+        res.json({ success: true, message: "Reporte enviado" });
+    });
+});
+
 // Notificaciones
 
 // Obtener notificaciones del usuario
