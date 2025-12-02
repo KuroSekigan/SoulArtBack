@@ -1294,6 +1294,31 @@ app.post('/notificaciones/vistas', async (req, res) => {
     });
 });
 
+app.post('/traducir_globos', async (req, res) => {
+    const { texto, target } = req.body;
+
+    try {
+        const response = await axios.post(
+            "https://libretranslatelibretranslate-production-229d.up.railway.app/translate",
+            {
+                q: texto,
+                source: "auto",
+                target: target,
+                format: "text"
+            },
+            {
+                headers: { "Content-Type": "application/json" }
+            }
+        );
+
+        res.json({ traducido: response.data.translatedText });
+
+    } catch (err) {
+        console.error("Error traduciendo:", err.response?.data || err);
+        res.status(500).json({ error: "Error traduciendo" });
+    }
+});
+
 //Stripe
 app.post("/create-checkout-session", async (req, res) => {
   try {
