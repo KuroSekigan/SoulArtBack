@@ -1356,29 +1356,34 @@ app.post('/notificaciones/vistas', async (req, res) => {
     });
 });
 
-app.post('/traducir_globos', async (req, res) => {
-    const { texto, target } = req.body;
+app.post("/traducir_globos", async (req, res) => {
+  const { textos, target } = req.body;
+  const api = "https://https://libretranslatelibretranslate-production-229d.up.railway.app/s/translate";
 
-    try {
-        const response = await axios.post(
-            "https://libretranslatelibretranslate-production-229d.up.railway.app/translate",
-            {
-                q: texto,
-                source: "auto",
-                target: target,
-                format: "text"
-            },
-            {
-                headers: { "Content-Type": "application/json" }
-            }
-        );
+  if (!textos || !Array.isArray(textos)) {
+    return res.status(400).json({ error: "Faltan textos" });
+  }
 
-        res.json({ traducido: response.data.translatedText });
+  try {
+    const traducciones = [];
 
-    } catch (err) {
-        console.error("Error traduciendo:", err.response?.data || err);
-        res.status(500).json({ error: "Error traduciendo" });
+    for (const texto of textos) {
+      const r = await axios.post(api, {
+        q: texto,
+        source: "auto",
+        target,
+        format: "text"
+      });
+
+      traducciones.push(r.data.translatedText);
     }
+
+    res.json({ traducciones });
+
+  } catch (err) {
+    console.error("Error traduciendo:", err.response?.data || err);
+    res.status(500).json({ error: "Error en traducción" });
+  }
 });
 
 //Stripe
