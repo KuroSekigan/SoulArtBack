@@ -10,13 +10,20 @@ import streamifier from 'streamifier';
 import jwt from 'jsonwebtoken';
 import admin from './firebase.js';
 import Stripe from "stripe";
+import dotenv from "dotenv";
+import axios from "axios";
 
 // Inicialización
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
 app.use(cors());
+dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
+const PAYPAL_API = process.env.PAYPAL_API;
+const PAYPAL_PLAN_ID = process.env.PAYPAL_PLAN_ID; 
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
@@ -164,13 +171,22 @@ app.post('/login', (req, res) => {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.rol // <--- AGREGADO TAMBIÉN AL TOKEN (OPCIONAL PERO ÚTIL)
                     },
                     JWT_SECRET,
-                    { expiresIn: '8h' } // el token durará 2 horas
+                    { expiresIn: '8h' }
                 );
 
-                res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
+                // 👇 AQUÍ ESTÁ EL CAMBIO IMPORTANTE 👇
+                res.json({ 
+                    success: true, 
+                    message: '¡Login exitoso!', 
+                    token, 
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.tipo // <--- ¡AHORA SÍ LO ENVIAMOS AL FRONT!
+                }); 
+                
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
@@ -191,14 +207,13 @@ app.post('/google-login', async (req, res) => {
             return res.status(400).json({ error: 'Token de Google requerido' });
         }
 
-        // ✅ Verificar token con Firebase Admin
+        // Verificar token con Firebase Admin
         const decoded = await admin.auth().verifyIdToken(token);
 
         const correo = decoded.email;
-        const nombre_usuario = decoded.name || correo.split('@')[0]; // fallback si no hay name
+        const nombre_usuario = decoded.name || correo.split('@')[0];
         const foto_perfil = decoded.picture || 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753396083/default_profile_htx1ge.png';
 
-        // 🔍 Revisar si el usuario ya existe
         const query = 'SELECT * FROM usuarios WHERE correo = ?';
         db.query(query, [correo], async (err, results) => {
             if (err) {
@@ -206,6 +221,7 @@ app.post('/google-login', async (req, res) => {
                 return res.status(500).json({ error: 'Error en el servidor' });
             }
 
+            // CASO A: El usuario YA existe en la base de datos
             if (results.length > 0) {
                 const usuario = results[0];
 
@@ -213,13 +229,14 @@ app.post('/google-login', async (req, res) => {
                     return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
                 }
 
-                // ✅ Usuario existente → generar token JWT de tu app
+                // ✅ CORRECCIÓN 2: Incluir 'rol' en el token de Google
                 const appToken = jwt.sign(
                     {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.tipo // <--- ¡AQUÍ FALTABA ESTO!
                     },
                     JWT_SECRET,
                     { expiresIn: '8h' }
@@ -229,10 +246,11 @@ app.post('/google-login', async (req, res) => {
                     success: true,
                     message: '¡Login con Google exitoso!',
                     token: appToken,
-                    foto_perfil: usuario.foto_perfil
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.tipo // <--- ¡Y AQUÍ TAMBIÉN!
                 });
             } else {
-                // ❌ Usuario no existe → debe crear contraseña
+                // CASO B: Usuario Nuevo (No existe)
                 return res.json({
                     success: false,
                     requirePassword: true,
@@ -377,6 +395,68 @@ app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
     });
 });
 
+app.post('/reportar', verificarToken, (req, res) => {
+    const { tipo, id_objetivo, motivo } = req.body;
+    const id_usuario = req.user.id;
+
+    if (!tipo || !id_objetivo || !motivo) {
+        return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    const sql = `
+        INSERT INTO reportes (id_usuario, tipo, id_objetivo, motivo)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    db.query(sql, [id_usuario, tipo, id_objetivo, motivo], (err) => {
+        if (err) {
+            console.error("❌ Error al crear reporte:", err);
+            return res.status(500).json({ error: "Error al reportar" });
+        }
+
+        res.json({ success: true, message: "Reporte enviado" });
+    });
+});
+
+app.get('/comics/top-carrusel', (req, res) => {
+    const sql = `
+        SELECT 
+            c.id,
+            c.titulo,
+            c.descripcion,
+            c.portada_url,
+            c.autor_id,
+
+            c.vistas AS vistas,
+            COALESCE(l.likes, 0) AS likes,
+            COALESCE(d.dislikes, 0) AS dislikes,
+            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
+        FROM comics c
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS likes
+            FROM reacciones_comics
+            WHERE tipo = 'like'
+            GROUP BY id_comic
+        ) l ON l.id_comic = c.id
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS dislikes
+            FROM reacciones_comics
+            WHERE tipo = 'dislike'
+            GROUP BY id_comic
+        ) d ON d.id_comic = c.id
+        ORDER BY score DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, result) => {
+        if (err) {
+            console.error("❌ Error al obtener cómics top:", err);
+            return res.status(500).json({ error: "Error al obtener cómics top" });
+        }
+        res.json(result);
+    });
+});
+
 function verificarToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -407,7 +487,7 @@ app.get('/usuario/:id/comics', (req, res) => {
 
 // Obtener todos los cómics que estén en estado "publicado"
 app.get('/comics/publicados', (req, res) => {
-    const { q } = req.query;
+    const { q, estado, tipo, generos } = req.query;
 
     let sql = `
         SELECT comics.*, usuarios.nombre_usuario AS autor
@@ -415,18 +495,90 @@ app.get('/comics/publicados', (req, res) => {
         JOIN usuarios ON comics.autor_id = usuarios.id
         WHERE comics.publicacion = 'publicado'
     `;
+
     let params = [];
 
+    // 🔍 FILTRO DE BÚSQUEDA
     if (q) {
         sql += ` AND (comics.titulo LIKE ? OR usuarios.nombre_usuario LIKE ?)`;
         params.push(`%${q}%`, `%${q}%`);
     }
 
+    // 🟦 FILTRO DE ESTADO
+    if (estado) {
+        sql += ` AND comics.estado = ?`;
+        params.push(estado);
+    }
+
+    // 🟥 FILTRO DE TIPO
+    if (tipo) {
+        sql += ` AND comics.tipo = ?`;
+        params.push(tipo);
+    }
+
+    // 🟩 FILTRO DE GÉNERO
+    if (generos) {
+        sql += ` AND comics.generos = ?`;
+        params.push(generos);
+    }
+
+    // ORDENAMIENTO
     sql += ` ORDER BY comics.fecha_creacion DESC`;
 
+    // ✔ Ejecutar consulta
     db.query(sql, params, (err, results) => {
         if (err) {
             console.error('❌ Error al obtener cómics publicados:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
+// OBRAS MÁS GUSTADAS
+app.get('/comics/mas-gustados', (req, res) => {
+    const sql = `
+        SELECT 
+            c.*, 
+            u.nombre_usuario AS autor,
+            COUNT(r.id) AS likes
+        FROM comics c
+        JOIN usuarios u ON c.autor_id = u.id
+        LEFT JOIN reacciones_comics r 
+            ON c.id = r.id_comic AND r.tipo = 'like'
+        WHERE c.publicacion = 'publicado'
+        GROUP BY c.id
+        ORDER BY likes DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics más gustados:', err);
+            return res.status(500).json({ error: 'Error en el servidor' });
+        }
+
+        res.json(results);
+    });
+});
+
+// OBRAS MÁS LEÍDAS
+app.get('/comics/mas-leidos', (req, res) => {
+    const sql = `
+        SELECT 
+            c.*, 
+            u.nombre_usuario AS autor
+        FROM comics c
+        JOIN usuarios u ON c.autor_id = u.id
+        WHERE c.publicacion = 'publicado'
+        ORDER BY c.vistas DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('❌ Error al obtener cómics más leídos:', err);
             return res.status(500).json({ error: 'Error en el servidor' });
         }
 
@@ -512,6 +664,20 @@ app.get('/comic/:id', (req, res) => {
 
         res.json(results[0]);
     });
+});
+
+app.put("/comic/:id/vistas", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.promise().query(
+      "UPDATE comics SET vistas = vistas + 1 WHERE id = ?",
+      [id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Error al actualizar vistas:", err);
+    res.status(500).json({ success: false });
+  }
 });
 
 app.get('/favoritos/:id_usuario', (req, res) => {
@@ -1185,6 +1351,36 @@ app.post('/notificaciones/vistas', async (req, res) => {
     });
 });
 
+app.post("/traducir_globos", async (req, res) => {
+  const { textos, target } = req.body;
+  const api = "https://libretranslatelibretranslate-production-229d.up.railway.app/translate";
+
+  if (!textos || !Array.isArray(textos)) {
+    return res.status(400).json({ error: "Faltan textos" });
+  }
+
+  try {
+    const traducciones = [];
+
+    for (const texto of textos) {
+      const r = await axios.post(api, {
+        q: texto,
+        source: "auto",
+        target,
+        format: "text"
+      });
+
+      traducciones.push(r.data.translatedText);
+    }
+
+    res.json({ traducciones });
+
+  } catch (err) {
+    console.error("Error traduciendo:", err.response?.data || err);
+    res.status(500).json({ error: "Error en traducción" });
+  }
+});
+
 //Stripe
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -1364,6 +1560,277 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   }
 });
 
+//Paypal
+app.post("/create-paypal-subscription", async (req, res) => {
+  try {
+    const { comicId } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.id;
+
+    // 🔑 Generar access token de PayPal
+    const basicAuth = Buffer.from(
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
+    ).toString("base64");
+
+    const tokenRes = await axios.post(
+      `${process.env.PAYPAL_API}/v1/oauth2/token`,
+      "grant_type=client_credentials",
+      {
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const accessToken = tokenRes.data.access_token;
+
+    // 💳 Crear la suscripción
+    const subscriptionRes = await axios.post(
+      `${process.env.PAYPAL_API}/v1/billing/subscriptions`,
+      {
+        plan_id: process.env.PAYPAL_PLAN_ID, // ✅ Usa tu plan mensual aquí
+        custom_id: `${comicId}_${userId}`,
+        application_context: {
+          brand_name: "SoulArt",
+          locale: "es-MX",
+          shipping_preference: "NO_SHIPPING",
+          user_action: "SUBSCRIBE_NOW",
+          return_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_success=true`,
+          cancel_url: `https://soulart-production.up.railway.app/comicInfo/${comicId}?paypal_cancel=true`,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const approvalUrl = subscriptionRes.data.links.find(
+      (link) => link.rel === "approve"
+    ).href;
+
+    res.json({ url: approvalUrl });
+  } catch (err) {
+    console.error("❌ Error creando suscripción PayPal:", err.response?.data || err.message);
+    console.error("🔍 Stack trace:", err.stack);
+    res.status(500).json({ error: "No se pudo crear la suscripción con PayPal" });
+  }
+});
+
+
+// 🧩 Webhook PayPal
+app.post("/paypal/webhook", express.json({ type: "application/json" }), async (req, res) => {
+  try {
+    const event = req.body;
+
+    console.log(`📦 Evento recibido de PayPal: ${event.event_type}`);
+
+    switch (event.event_type) {
+      // ✅ SUSCRIPCIÓN ACTIVADA
+      case "BILLING.SUBSCRIPTION.ACTIVATED": {
+        const subscription = event.resource;
+        const [comicId, userId] = subscription.custom_id.split("_");
+
+        console.log("✅ Suscripción PayPal activada:", subscription.id);
+
+        await db.promise().query(
+          `INSERT INTO suscripciones 
+            (usuario_id, obra_id, paypal_subscription_id, plan, estado, fecha_inicio)
+           VALUES (?, ?, ?, ?, 'activa', NOW())
+           ON DUPLICATE KEY UPDATE estado='activa', fecha_inicio=NOW()`,
+          [userId, comicId, subscription.id, "mensual"]
+        );
+
+        break;
+      }
+
+      // 💰 PAGO EXITOSO
+      case "PAYMENT.SALE.COMPLETED": {
+        const payment = event.resource;
+        const subscriptionId = payment.billing_agreement_id;
+
+        if (!subscriptionId) {
+          console.log("⚠️ Pago sin subscriptionId, ignorando.");
+          break;
+        }
+
+        const ultimoPago = new Date(payment.create_time);
+        const proximoPago = new Date();
+        proximoPago.setMonth(proximoPago.getMonth() + 1);
+
+        console.log("💰 Pago PayPal exitoso:", subscriptionId);
+
+        await db.promise().query(
+          `UPDATE suscripciones 
+           SET ultimo_pago = ?, proximo_pago = ?, fecha_fin = ?
+           WHERE paypal_subscription_id = ?`,
+          [ultimoPago, proximoPago, proximoPago, subscriptionId]
+        );
+
+        break;
+      }
+
+      // ⚠️ SUSCRIPCIÓN CANCELADA
+      case "BILLING.SUBSCRIPTION.CANCELLED": {
+        const subscription = event.resource;
+
+        console.log("⚠️ Suscripción PayPal cancelada:", subscription.id);
+
+        await db.promise().query(
+          `UPDATE suscripciones 
+           SET estado = 'cancelada', fecha_fin = NOW()
+           WHERE paypal_subscription_id = ?`,
+          [subscription.id]
+        );
+
+        break;
+      }
+
+      default:
+        console.log(`ℹ️ Evento PayPal no manejado: ${event.event_type}`);
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Error procesando webhook PayPal:", err.response?.data || err.message);
+    res.sendStatus(500);
+  }
+});
+
+// ❌ CANCELAR SUSCRIPCIÓN (Stripe o PayPal)
+app.post("/cancelar-suscripcion/:id", verificarToken, async (req, res) => {
+  const subId = req.params.id;
+  const userId = req.usuario.id;
+
+  try {
+    // 1️⃣ Buscar suscripción en la base de datos
+    const [rows] = await db.promise().query(
+      `SELECT * FROM suscripciones WHERE id = ? AND usuario_id = ? LIMIT 1`,
+      [subId, userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Suscripción no encontrada" });
+    }
+
+    const sus = rows[0];
+
+    // ---------------------------------------------------------
+    // 🚀 CANCELAR EN STRIPE
+    // ---------------------------------------------------------
+    if (sus.stripe_subscription_id) {
+      console.log("🔴 Cancelando en STRIPE:", sus.stripe_subscription_id);
+
+      await stripe.subscriptions.update(sus.stripe_subscription_id, {
+        cancel_at_period_end: true, // Cancela al finalizar el mes pagado
+      });
+    }
+
+    // ---------------------------------------------------------
+    // 🚀 CANCELAR EN PAYPAL
+    // ---------------------------------------------------------
+    if (sus.paypal_subscription_id) {
+      console.log("🔴 Cancelando en PAYPAL:", sus.paypal_subscription_id);
+
+      // Obtener access token PayPal
+      const basicAuth = Buffer.from(
+        `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
+      ).toString("base64");
+
+      const tokenRes = await axios.post(
+        `${process.env.PAYPAL_API}/v1/oauth2/token`,
+        "grant_type=client_credentials",
+        {
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+
+      const accessToken = tokenRes.data.access_token;
+
+      // Cancelar suscripción PayPal
+      await axios.post(
+        `${process.env.PAYPAL_API}/v1/billing/subscriptions/${sus.paypal_subscription_id}/cancel`,
+        {
+          reason: "Cancelado por el usuario",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    // ---------------------------------------------------------
+    // 🗂️ 3. Actualizar base de datos
+    // ---------------------------------------------------------
+    await db.promise().query(
+      `UPDATE suscripciones SET estado = 'cancelada' WHERE id = ?`,
+      [subId]
+    );
+
+    res.json({ success: true, message: "Suscripción cancelada correctamente" });
+  } catch (error) {
+    console.error("❌ Error cancelando suscripción:", error);
+    res.status(500).json({ success: false, message: "Error al cancelar suscripción" });
+  }
+});
+
+// OBTENER SUSCRIPCIONES DEL USUARIO
+app.get("/suscripciones/:usuario_id", async (req, res) => {
+    const usuario_id = req.params.usuario_id;
+
+    const query = `
+        SELECT 
+            s.id,
+            s.usuario_id,
+            s.obra_id,
+            s.stripe_subscription_id,
+            s.stripe_customer_id,
+            s.plan,
+            s.estado,
+            s.fecha_inicio,
+            s.fecha_fin,
+            s.ultimo_pago,
+            s.proximo_pago,
+            s.paypal_subscription_id,
+            c.titulo AS comic_titulo
+        FROM suscripciones s
+        LEFT JOIN comics c ON s.obra_id = c.id
+        WHERE s.usuario_id = ?;
+    `;
+
+    try {
+        const [results] = await db.promise().query(query, [usuario_id]);
+
+        return res.json({
+            success: true,
+            suscripciones: results
+        });
+
+    } catch (err) {
+        console.error("Error al obtener suscripciones:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Error del servidor"
+        });
+    }
+});
+
 // GET /suscripciones/validar/:comicId
 app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   const userId = req.usuario.id;
@@ -1390,6 +1857,108 @@ app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   }
 });
 
+
+//Tablas del dashboard
+// 1. Obtener todos los usuarios
+app.get('/usuarios', (req, res) => {
+    const query = 'SELECT * FROM usuarios';
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener usuarios:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Editar usuario
+app.put('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+    const { nombre_usuario, correo, biografia } = req.body;
+
+    const query = 'UPDATE usuarios SET nombre_usuario = ?, correo = ?, biografia = ? WHERE id = ?';
+    db.query(query, [nombre_usuario, correo, biografia, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar usuario:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Usuario actualizado exitosamente');
+    });
+});
+
+// 3. Eliminar usuario
+app.delete('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM usuarios WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar usuario:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Usuario eliminado exitosamente');
+    });
+});
+
+// ==========================================
+// 📚 CRUD DE CÓMICS (Dashboard Admin)
+// ==========================================
+
+// 1. Obtener todos los cómics
+app.get('/comics', (req, res) => {
+    // Ordenamos por ID descendente para ver los nuevos primero
+    const query = 'SELECT * FROM comics ORDER BY id DESC'; 
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener cómics:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Crear cómic (Admin manual)
+app.post('/comics', (req, res) => {
+    const { titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion } = req.body;
+    const query = 'INSERT INTO comics (titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    
+    db.query(query, [titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion], (err, result) => {
+        if (err) {
+            console.error('Error al crear cómic:', err);
+            return res.status(500).send('Error al crear');
+        }
+        res.json({ id: result.insertId, ...req.body });
+    });
+});
+
+// 3. Editar cómic
+app.put('/comics/:id', (req, res) => {
+    const { id } = req.params;
+    const { titulo, descripcion, estado, tipo, generos, publicacion } = req.body;
+
+    const query = 'UPDATE comics SET titulo = ?, descripcion = ?, estado = ?, tipo = ?, generos = ?, publicacion = ? WHERE id = ?';
+    db.query(query, [titulo, descripcion, estado, tipo, generos, publicacion, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar cómic:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Cómic actualizado exitosamente');
+    });
+});
+
+// 4. Eliminar cómic
+app.delete('/comics/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM comics WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar cómic:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Cómic eliminado exitosamente');
+    });
+});
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
