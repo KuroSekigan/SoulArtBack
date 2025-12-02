@@ -554,116 +554,111 @@ app.get('/comic/:id/capitulos', (req, res) => {
 });
 
 // Subir capítulo + páginas
-app.post('/comic/:comicId/capitulos', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
-    const comicId = req.params.comicId;
-    const { titulo, numero, globos } = req.body;
-    const imagenes = req.files;
+app.put('/capitulo/:capituloId', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
+    const capituloId = req.params.capituloId;
+    const { titulo, numero, globos, imagenesExistentes } = req.body;
+    const nuevasImagenes = req.files || [];
 
     if (!titulo || !numero) {
         return res.status(400).json({ error: 'Faltan campos obligatorios: título o número' });
     }
 
-    const sqlCapitulo = `
-        INSERT INTO capitulos (comic_id, titulo, numero, fecha_publicacion)
-        VALUES (?, ?, ?, NOW())
-    `;
+    // 1️⃣ Actualizar título y número
+    const sqlUpdateCap = `UPDATE capitulos SET titulo = ?, numero = ? WHERE id = ?`;
+    db.query(sqlUpdateCap, [titulo, numero, capituloId], (err) => {
+        if (err) return res.status(500).json({ error: 'Error al actualizar capítulo' });
 
-    db.query(sqlCapitulo, [comicId, titulo, numero], (err, result) => {
-        if (err) {
-            console.error('❌ Error al insertar capítulo:', err);
-            return res.status(500).json({ error: 'Error al crear capítulo' });
+        // 2️⃣ Manejar páginas
+        let urlsExistentes = [];
+        try {
+            urlsExistentes = JSON.parse(imagenesExistentes || "[]");
+        } catch(e) {
+            urlsExistentes = [];
         }
 
-        const capituloId = result.insertId;
-        const defaultUrl = 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753675703/default_pagina_sqeaj8.png';
-        const paginasGuardadas = [];
+        // Eliminar páginas anteriores
+        const sqlDeletePaginas = `DELETE FROM paginas WHERE capitulo_id = ?`;
+        db.query(sqlDeletePaginas, [capituloId], async (err) => {
+            if (err) return res.status(500).json({ error: 'Error al reiniciar páginas' });
 
-        const sqlPagina = `
-            INSERT INTO paginas (capitulo_id, numero, imagen_url)
-            VALUES (?, ?, ?)
-        `;
+            // Insertar páginas nuevas y existentes
+            const todasLasPaginas = [
+                ...urlsExistentes.map(url => ({ tipo: 'existente', url })),
+                ...nuevasImagenes.map(file => ({ tipo: 'nueva', url: file.path }))
+            ];
 
-        const tareas = (imagenes && imagenes.length > 0)
-            ? imagenes.map((img, index) => {
-                return new Promise((resolve, reject) => {
-                    db.query(sqlPagina, [capituloId, index + 1, img.path], (err, result) => {
-                        if (err) return reject(err);
-                        paginasGuardadas[index] = result.insertId; // Guardamos el id de la página insertada
-                        resolve();
+            const paginasGuardadas = [];
+
+            try {
+                for (let i = 0; i < todasLasPaginas.length; i++) {
+                    const p = todasLasPaginas[i];
+                    const sqlInsertPagina = `INSERT INTO paginas (capitulo_id, numero, imagen_url) VALUES (?, ?, ?)`;
+                    const result = await new Promise((resolve, reject) => {
+                        db.query(sqlInsertPagina, [capituloId, i + 1, p.url], (err, result) => {
+                            if (err) return reject(err);
+                            resolve(result);
+                        });
                     });
-                });
-            })
-            : [new Promise((resolve, reject) => {
-                db.query(sqlPagina, [capituloId, 1, defaultUrl], (err, result) => {
-                    if (err) return reject(err);
-                    paginasGuardadas[0] = result.insertId;
-                    resolve();
-                });
-            })];
-
-        Promise.all(tareas)
-            .then(() => {
-                // Si no hay globos, responder ya
-                if (!globos) {
-                    return res.json({
-                        success: true,
-                        message: 'Capítulo y páginas subidos correctamente (sin globos)',
-                        capitulo_id: capituloId
-                    });
+                    paginasGuardadas.push(result.insertId);
                 }
 
-                let globosData;
-                try {
-                    globosData = JSON.parse(globos);
-                } catch (e) {
-                    console.warn('⚠️ Globos no son un JSON válido');
-                    return res.status(400).json({ error: 'Formato de globos inválido' });
-                }
+                // 3️⃣ Manejar globos
+                if (globos) {
+                    let globosData = [];
+                    try {
+                        globosData = JSON.parse(globos);
+                    } catch(e) {
+                        console.warn('Globos no son un JSON válido');
+                        globosData = [];
+                    }
 
-                // Insertar globos
-                const sqlGlobo = `
-                    INSERT INTO globos_texto (pagina_id, tipo, texto, x, y, ancho, alto, fuente, tamano)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `;
-
-                const tareasGlobos = globosData.map(globo => {
-                    const {
-                        paginaIndice, tipo, texto, x, y, ancho, alto, fuente, tamano
-                    } = globo;
-
-                    const paginaId = paginasGuardadas[paginaIndice];
-                    if (paginaId === undefined) return Promise.resolve(); // Evitar error si el índice no existe
-
-                    return new Promise((resolve, reject) => {
-                        db.query(sqlGlobo, [
-                            paginaId,
-                            tipo || 'normal',
-                            texto,
-                            parseFloat(x),
-                            parseFloat(y),
-                            parseFloat(ancho),
-                            parseFloat(alto),
-                            fuente || 'Arial',
-                            tamano || 14
-                        ], (err) => {
+                    // Primero eliminamos todos los globos antiguos
+                    const sqlDeleteGlobos = `DELETE FROM globos_texto WHERE pagina_id IN (SELECT id FROM paginas WHERE capitulo_id = ?)`;
+                    await new Promise((resolve, reject) => {
+                        db.query(sqlDeleteGlobos, [capituloId], (err) => {
                             if (err) return reject(err);
                             resolve();
                         });
                     });
+
+                    // Insertar globos nuevos
+                    const sqlInsertGlobo = `
+                        INSERT INTO globos_texto (pagina_id, tipo, texto, x, y, ancho, alto, fuente, tamano)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `;
+                    for (let g of globosData) {
+                        const paginaId = paginasGuardadas[g.paginaIndice];
+                        if (!paginaId) continue;
+                        await new Promise((resolve, reject) => {
+                            db.query(sqlInsertGlobo, [
+                                paginaId,
+                                g.tipo || 'normal',
+                                g.texto || '',
+                                parseFloat(g.x) || 0,
+                                parseFloat(g.y) || 0,
+                                parseFloat(g.ancho) || 150,
+                                parseFloat(g.alto) || 100,
+                                g.fuente || 'Arial',
+                                g.tamano || 14
+                            ], (err) => {
+                                if (err) return reject(err);
+                                resolve();
+                            });
+                        });
+                    }
+                }
+
+                res.json({
+                    success: true,
+                    message: 'Capítulo editado correctamente',
+                    capitulo_id: capituloId
                 });
 
-                return Promise.all(tareasGlobos).then(() => {
-                    res.json({
-                        success: true,
-                        message: 'Capítulo, páginas y globos subidos correctamente',
-                        capitulo_id: capituloId
-                    });
-                });
-            })
-            .catch(error => {
-                console.error('❌ Error en subida:', error);
-                res.status(500).json({ error: 'Error al subir capítulo, páginas o globos' });
-            });
+            } catch (error) {
+                console.error('❌ Error al guardar páginas o globos:', error);
+                res.status(500).json({ error: 'Error al actualizar capítulo' });
+            }
+        });
     });
 });
 
