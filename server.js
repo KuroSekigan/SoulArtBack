@@ -1358,7 +1358,7 @@ app.post('/notificaciones/vistas', async (req, res) => {
 
 app.post("/traducir_globos", async (req, res) => {
   const { textos, target } = req.body;
-  const api = "https://https://libretranslatelibretranslate-production-229d.up.railway.app/s/translate";
+  const api = "https://libretranslatelibretranslate-production-229d.up.railway.app/s/translate";
 
   if (!textos || !Array.isArray(textos)) {
     return res.status(400).json({ error: "Faltan textos" });
