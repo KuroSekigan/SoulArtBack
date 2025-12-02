@@ -850,6 +850,18 @@ app.get('/capitulo/:id', (req, res) => {
 app.delete('/capitulo/:id', verificarToken, (req, res) => {
     const capituloId = req.params.id;
 
+    const eliminarComentariosSql = 'DELETE FROM comentarios WHERE capitulo_id = ?';
+
+    db.query(eliminarComentariosSql, [capituloId], (err) => {
+        if (err) {
+            console.error('❌ Error al eliminar comentarios:', err);
+            return res.status(500).json({ error: 'Error al eliminar comentarios' });
+        }
+
+        // --- CONTINÚA tu lógica actual aquí ---
+        eliminarPaginasYGlobos();
+    });
+
     // Paso 1: Obtener los IDs de las páginas del capítulo
     const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
 
