@@ -171,13 +171,22 @@ app.post('/login', (req, res) => {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.rol // <--- AGREGADO TAMBIÉN AL TOKEN (OPCIONAL PERO ÚTIL)
                     },
                     JWT_SECRET,
-                    { expiresIn: '8h' } // el token durará 2 horas
+                    { expiresIn: '8h' }
                 );
 
-                res.json({ success: true, message: '¡Login exitoso!', token, foto_perfil: usuario.foto_perfil });
+                // 👇 AQUÍ ESTÁ EL CAMBIO IMPORTANTE 👇
+                res.json({ 
+                    success: true, 
+                    message: '¡Login exitoso!', 
+                    token, 
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.tipo // <--- ¡AHORA SÍ LO ENVIAMOS AL FRONT!
+                }); 
+                
             } else {
                 res.json({ success: false, message: 'Correo o contraseña incorrectos' });
             }
@@ -198,14 +207,13 @@ app.post('/google-login', async (req, res) => {
             return res.status(400).json({ error: 'Token de Google requerido' });
         }
 
-        // ✅ Verificar token con Firebase Admin
+        // Verificar token con Firebase Admin
         const decoded = await admin.auth().verifyIdToken(token);
 
         const correo = decoded.email;
-        const nombre_usuario = decoded.name || correo.split('@')[0]; // fallback si no hay name
+        const nombre_usuario = decoded.name || correo.split('@')[0];
         const foto_perfil = decoded.picture || 'https://res.cloudinary.com/dtz7wzh0c/image/upload/v1753396083/default_profile_htx1ge.png';
 
-        // 🔍 Revisar si el usuario ya existe
         const query = 'SELECT * FROM usuarios WHERE correo = ?';
         db.query(query, [correo], async (err, results) => {
             if (err) {
@@ -213,6 +221,7 @@ app.post('/google-login', async (req, res) => {
                 return res.status(500).json({ error: 'Error en el servidor' });
             }
 
+            // CASO A: El usuario YA existe en la base de datos
             if (results.length > 0) {
                 const usuario = results[0];
 
@@ -220,13 +229,14 @@ app.post('/google-login', async (req, res) => {
                     return res.json({ success: false, message: 'Este usuario está baneado o inhabilitado.' });
                 }
 
-                // ✅ Usuario existente → generar token JWT de tu app
+                // ✅ CORRECCIÓN 2: Incluir 'rol' en el token de Google
                 const appToken = jwt.sign(
                     {
                         id: usuario.id,
                         correo: usuario.correo,
                         nombre_usuario: usuario.nombre_usuario,
-                        foto_perfil: usuario.foto_perfil
+                        foto_perfil: usuario.foto_perfil,
+                        rol: usuario.tipo // <--- ¡AQUÍ FALTABA ESTO!
                     },
                     JWT_SECRET,
                     { expiresIn: '8h' }
@@ -236,10 +246,11 @@ app.post('/google-login', async (req, res) => {
                     success: true,
                     message: '¡Login con Google exitoso!',
                     token: appToken,
-                    foto_perfil: usuario.foto_perfil
+                    foto_perfil: usuario.foto_perfil,
+                    rol: usuario.tipo // <--- ¡Y AQUÍ TAMBIÉN!
                 });
             } else {
-                // ❌ Usuario no existe → debe crear contraseña
+                // CASO B: Usuario Nuevo (No existe)
                 return res.json({
                     success: false,
                     requirePassword: true,
@@ -1771,6 +1782,108 @@ app.get("/suscripciones/validar/:comicId", verificarToken, async (req, res) => {
   }
 });
 
+
+//Tablas del dashboard
+// 1. Obtener todos los usuarios
+app.get('/usuarios', (req, res) => {
+    const query = 'SELECT * FROM usuarios';
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener usuarios:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Editar usuario
+app.put('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+    const { nombre_usuario, correo, biografia } = req.body;
+
+    const query = 'UPDATE usuarios SET nombre_usuario = ?, correo = ?, biografia = ? WHERE id = ?';
+    db.query(query, [nombre_usuario, correo, biografia, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar usuario:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Usuario actualizado exitosamente');
+    });
+});
+
+// 3. Eliminar usuario
+app.delete('/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM usuarios WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar usuario:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Usuario eliminado exitosamente');
+    });
+});
+
+// ==========================================
+// 📚 CRUD DE CÓMICS (Dashboard Admin)
+// ==========================================
+
+// 1. Obtener todos los cómics
+app.get('/comics', (req, res) => {
+    // Ordenamos por ID descendente para ver los nuevos primero
+    const query = 'SELECT * FROM comics ORDER BY id DESC'; 
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener cómics:', err);
+            return res.status(500).send('Error del servidor');
+        }
+        res.json(results);
+    });
+});
+
+// 2. Crear cómic (Admin manual)
+app.post('/comics', (req, res) => {
+    const { titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion } = req.body;
+    const query = 'INSERT INTO comics (titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    
+    db.query(query, [titulo, descripcion, idioma_id, autor_id, portada_url, estado, tipo, generos, publicacion], (err, result) => {
+        if (err) {
+            console.error('Error al crear cómic:', err);
+            return res.status(500).send('Error al crear');
+        }
+        res.json({ id: result.insertId, ...req.body });
+    });
+});
+
+// 3. Editar cómic
+app.put('/comics/:id', (req, res) => {
+    const { id } = req.params;
+    const { titulo, descripcion, estado, tipo, generos, publicacion } = req.body;
+
+    const query = 'UPDATE comics SET titulo = ?, descripcion = ?, estado = ?, tipo = ?, generos = ?, publicacion = ? WHERE id = ?';
+    db.query(query, [titulo, descripcion, estado, tipo, generos, publicacion, id], (err, result) => {
+        if (err) {
+            console.error('Error al actualizar cómic:', err);
+            return res.status(500).send('Error al actualizar');
+        }
+        res.send('Cómic actualizado exitosamente');
+    });
+});
+
+// 4. Eliminar cómic
+app.delete('/comics/:id', (req, res) => {
+    const { id } = req.params;
+
+    const query = 'DELETE FROM comics WHERE id = ?';
+    db.query(query, [id], (err, result) => {
+        if (err) {
+            console.error('Error al eliminar cómic:', err);
+            return res.status(500).send('Error al eliminar');
+        }
+        res.send('Cómic eliminado exitosamente');
+    });
+});
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
