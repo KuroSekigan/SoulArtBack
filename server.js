@@ -1365,6 +1365,37 @@ app.post('/notificaciones/vistas', async (req, res) => {
     });
 });
 
+app.post("/traducir_globos", async (req, res) => {
+    const { textos, target } = req.body;
+
+    if (!Array.isArray(textos) || !target) {
+        return res.status(400).json({ error: "Datos inválidos" });
+    }
+
+    try {
+        const traducciones = [];
+
+        for (const texto of textos) {
+            const r = await axios.post("https://libretranslate.com/translate", {
+                q: texto,
+                source: "auto",
+                target: target,
+                format: "text"
+            }, {
+                headers: { accept: "application/json" }
+            });
+
+            traducciones.push(r.data.translatedText);
+        }
+
+        return res.json({ traducciones });
+
+    } catch (err) {
+        console.error("Error traduciendo:", err);
+        return res.status(500).json({ error: "Fallo al traducir" });
+    }
+});
+
 //Stripe
 app.post("/create-checkout-session", async (req, res) => {
   try {
