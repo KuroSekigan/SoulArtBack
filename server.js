@@ -16,7 +16,6 @@ import axios from "axios";
 // Inicialización
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
-app.use(cors());
 dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -24,6 +23,24 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 const PAYPAL_API = process.env.PAYPAL_API;
 const PAYPAL_PLAN_ID = process.env.PAYPAL_PLAN_ID; 
+
+
+
+///Superset
+const corsOptions = {
+  origin: [
+    'https://soulart-production.up.railway.app', 
+    'http://localhost:5173',                      
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+
+app.use(cors(corsOptions));
+app.use(express.json());
 
 
 // Estos deben ir antes que multer
@@ -1978,32 +1995,15 @@ app.delete('/comics/:id', (req, res) => {
 
 
 /// Conexion a superset
-const corsOptions = {
-  origin: [
-    'https://soulart-production.up.railway.app', // Tu dominio en Railway
-    'http://localhost:5173',                      // Tu local Vite
-    'http://localhost:3000'                       // Tu local React estándar
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-
-app.use(cors(corsOptions));
-app.use(express.json()); // Para entender JSON en el body
-
-// 2. RUTA SEGURA PARA OBTENER EL TOKEN (La magia)
-// Tu React llamará a ESTA ruta, no a Superset directamente.
 app.post('/api/superset-token', async (req, res) => {
   try {
     const { dashboardId } = req.body;
     
-    // DATOS DE SUPERSET (Idealmente usa variables de entorno en Railway)
     const SUPERSET_URL = process.env.SUPERSET_URL || "https://superset2-production.up.railway.app";
     const ADMIN_USERNAME = process.env.SUPERSET_ADMIN_USERNAME || "admin";
     const ADMIN_PASSWORD = process.env.SUPERSET_ADMIN_PASSWORD || "admin";
 
-    // A) Obtener Access Token (Loguearse como admin)
+    // A) Access Token
     const loginBody = new FormData();
     loginBody.append('username', ADMIN_USERNAME);
     loginBody.append('password', ADMIN_PASSWORD);
@@ -2015,7 +2015,7 @@ app.post('/api/superset-token', async (req, res) => {
     });
     const accessToken = loginResponse.data.access_token;
 
-    // B) Canjear Access Token por Guest Token (Pase de invitado)
+    // B) Guest Token
     const guestTokenResponse = await axios.post(
       `${SUPERSET_URL}/api/v1/security/guest_token/`,
       {
@@ -2035,24 +2035,20 @@ app.post('/api/superset-token', async (req, res) => {
       }
     );
 
-    // C) Devolver SOLO el token seguro a React
     res.json({ token: guestTokenResponse.data.token });
 
   } catch (error) {
-    console.error('Error al conectar con Superset:', error.message);
-    res.status(500).json({ error: 'Error obteniendo el token gráfico' });
+    console.error('Error Supersert:', error.message);
+    res.status(500).json({ error: 'Error obteniendo token' });
   }
 });
 
-// 3. SERVIR TU REACT APP (Frontend)
-// Esto hace que cuando entres a la web, cargue tu React
-app.use(express.static(path.join(__dirname, 'dist'))); // O 'build' si usas Create React App
+// 3. SERVIR REACT
+app.use(express.static(path.join(__dirname, 'dist'))); 
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html')); // O 'build/index.html'
+  res.sendFile(path.join(__dirname, 'dist', 'index.html')); 
 });
-
-app.use(cors(corsOptions));
 
 // Puerto
 const PORT = 3001;
