@@ -1361,7 +1361,7 @@ app.post('/traducir_globos', async (req, res) => {
 
     try {
         const response = await axios.post(
-            "https://libretranslatelibretranslate-production-229d.up.railway.app/translate",
+            "libretranslate/libretranslate.railway.internal/translate",
             {
                 q: texto,
                 source: "auto",
