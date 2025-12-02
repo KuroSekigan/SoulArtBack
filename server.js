@@ -16,6 +16,7 @@ import axios from "axios";
 // Inicialización
 const app = express();
 const JWT_SECRET = 's3cr3t_s0ulart';
+app.use(cors());
 dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -23,25 +24,6 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 const PAYPAL_API = process.env.PAYPAL_API;
 const PAYPAL_PLAN_ID = process.env.PAYPAL_PLAN_ID; 
-
-
-
-///Superset
-const corsOptions = {
-  origin: [
-    'https://soulart-production.up.railway.app', 
-    'http://localhost:5173',                      
-    'http://localhost:3000'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-
-
-app.use(cors(corsOptions));
-app.use(express.json());
-
 
 // Estos deben ir antes que multer
 app.use(express.urlencoded({ extended: true }));
@@ -438,45 +420,6 @@ app.get('/usuario/:id/comics', (req, res) => {
         }
 
         res.json(results);
-    });
-});
-
-app.get('/comics/top-carrusel', (req, res) => {
-    const sql = `
-        SELECT 
-            c.id,
-            c.titulo,
-            c.descripcion,
-            c.portada_url,
-            c.autor_id,
-
-            c.vistas AS vistas,
-            COALESCE(l.likes, 0) AS likes,
-            COALESCE(d.dislikes, 0) AS dislikes,
-            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
-        FROM comics c
-        LEFT JOIN (
-            SELECT id_comic, COUNT(*) AS likes
-            FROM reacciones_comics
-            WHERE tipo = 'like'
-            GROUP BY id_comic
-        ) l ON l.id_comic = c.id
-        LEFT JOIN (
-            SELECT id_comic, COUNT(*) AS dislikes
-            FROM reacciones_comics
-            WHERE tipo = 'dislike'
-            GROUP BY id_comic
-        ) d ON d.id_comic = c.id
-        ORDER BY score DESC
-        LIMIT 6;
-    `;
-
-    db.query(sql, (err, result) => {
-        if (err) {
-            console.error("❌ Error al obtener cómics top:", err);
-            return res.status(500).json({ error: "Error al obtener cómics top" });
-        }
-        res.json(result);
     });
 });
 
@@ -918,68 +861,59 @@ app.get('/capitulo/:id', (req, res) => {
 app.delete('/capitulo/:id', verificarToken, (req, res) => {
     const capituloId = req.params.id;
 
-    // Paso 0: Eliminar comentarios relacionados al capítulo
-    const eliminarComentariosSql = 'DELETE FROM comentarios WHERE capitulo_id = ?';
+    // Paso 1: Obtener los IDs de las páginas del capítulo
+    const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
 
-    db.query(eliminarComentariosSql, [capituloId], (err) => {
+    db.query(obtenerPaginasSql, [capituloId], (err, paginas) => {
         if (err) {
-            console.error('❌ Error al eliminar comentarios del capítulo:', err);
-            return res.status(500).json({ error: 'Error al eliminar comentarios' });
+            console.error('❌ Error al obtener páginas del capítulo:', err);
+            return res.status(500).json({ error: 'Error al obtener páginas' });
         }
 
-        // Paso 1: Obtener IDs de páginas
-        const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
+        const paginaIds = paginas.map(p => p.id);
 
-        db.query(obtenerPaginasSql, [capituloId], (err, paginas) => {
+        if (paginaIds.length === 0) {
+            // No hay páginas, eliminar solo el capítulo
+            eliminarCapitulo();
+            return;
+        }
+
+        // Paso 2: Eliminar globos_texto asociados a esas páginas
+        const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
+
+        db.query(eliminarGlobosSql, [paginaIds], (err) => {
             if (err) {
-                console.error('❌ Error al obtener páginas del capítulo:', err);
-                return res.status(500).json({ error: 'Error al obtener páginas' });
+                console.error('❌ Error al eliminar globos de texto:', err);
+                return res.status(500).json({ error: 'Error al eliminar globos de texto' });
             }
 
-            const paginaIds = paginas.map(p => p.id);
+            // Paso 3: Eliminar las páginas
+            const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
 
-            if (paginaIds.length === 0) {
-                eliminarCapitulo();
-                return;
-            }
-
-            // Paso 2: Eliminar globos de esas páginas
-            const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
-
-            db.query(eliminarGlobosSql, [paginaIds], (err) => {
+            db.query(eliminarPaginasSql, [capituloId], (err) => {
                 if (err) {
-                    console.error('❌ Error al eliminar globos de texto:', err);
-                    return res.status(500).json({ error: 'Error al eliminar globos de texto' });
+                    console.error('❌ Error al eliminar páginas del capítulo:', err);
+                    return res.status(500).json({ error: 'Error al eliminar páginas' });
                 }
 
-                // Paso 3: Eliminar páginas
-                const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
-
-                db.query(eliminarPaginasSql, [capituloId], (err) => {
-                    if (err) {
-                        console.error('❌ Error al eliminar páginas del capítulo:', err);
-                        return res.status(500).json({ error: 'Error al eliminar páginas' });
-                    }
-
-                    // Paso 4: Eliminar el capítulo
-                    eliminarCapitulo();
-                });
+                // Paso 4: Eliminar el capítulo
+                eliminarCapitulo();
             });
         });
-
-        function eliminarCapitulo() {
-            const eliminarCapituloSql = 'DELETE FROM capitulos WHERE id = ?';
-
-            db.query(eliminarCapituloSql, [capituloId], (err) => {
-                if (err) {
-                    console.error('❌ Error al eliminar capítulo:', err);
-                    return res.status(500).json({ error: 'Error al eliminar capítulo' });
-                }
-
-                res.json({ success: true, message: 'Capítulo, páginas, globos y comentarios eliminados correctamente' });
-            });
-        }
     });
+
+    function eliminarCapitulo() {
+        const eliminarCapituloSql = 'DELETE FROM capitulos WHERE id = ?';
+
+        db.query(eliminarCapituloSql, [capituloId], (err) => {
+            if (err) {
+                console.error('❌ Error al eliminar capítulo:', err);
+                return res.status(500).json({ error: 'Error al eliminar capítulo' });
+            }
+
+            res.json({ success: true, message: 'Capítulo, páginas y globos eliminados correctamente' });
+        });
+    }
 });
 
 app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
@@ -1297,29 +1231,6 @@ app.post('/comentarios', (req, res) => {
     });
 });
 
-app.post('/reportar', verificarToken, (req, res) => {
-    const { tipo, id_objetivo, motivo } = req.body;
-    const id_usuario = req.user.id;
-
-    if (!tipo || !id_objetivo || !motivo) {
-        return res.status(400).json({ error: "Faltan datos" });
-    }
-
-    const sql = `
-        INSERT INTO reportes (id_usuario, tipo, id_objetivo, motivo)
-        VALUES (?, ?, ?, ?)
-    `;
-
-    db.query(sql, [id_usuario, tipo, id_objetivo, motivo], (err) => {
-        if (err) {
-            console.error("❌ Error al crear reporte:", err);
-            return res.status(500).json({ error: "Error al reportar" });
-        }
-
-        res.json({ success: true, message: "Reporte enviado" });
-    });
-});
-
 // Notificaciones
 
 // Obtener notificaciones del usuario
@@ -1381,37 +1292,6 @@ app.post('/notificaciones/vistas', async (req, res) => {
             res.status(500).json({ error: "Error al marcar notificaciones como vistas" });
         }
     });
-});
-
-app.post("/traducir_globos", async (req, res) => {
-    const { textos, target } = req.body;
-
-    if (!Array.isArray(textos) || !target) {
-        return res.status(400).json({ error: "Datos inválidos" });
-    }
-
-    try {
-        const traducciones = [];
-
-        for (const texto of textos) {
-            const r = await axios.post("https://libretranslate.com/translate", {
-                q: texto,
-                source: "auto",
-                target: target,
-                format: "text"
-            }, {
-                headers: { accept: "application/json" }
-            });
-
-            traducciones.push(r.data.translatedText);
-        }
-
-        return res.json({ traducciones });
-
-    } catch (err) {
-        console.error("Error traduciendo:", err);
-        return res.status(500).json({ error: "Fallo al traducir" });
-    }
 });
 
 //Stripe
@@ -1992,64 +1872,6 @@ app.delete('/comics/:id', (req, res) => {
         res.send('Cómic eliminado exitosamente');
     });
 });
-
-
-/// Conexion a superset
-app.post('/api/superset-token', async (req, res) => {
-  try {
-    const { dashboardId } = req.body;
-    
-    const SUPERSET_URL = process.env.SUPERSET_URL || "https://superset2-production.up.railway.app";
-    const ADMIN_USERNAME = process.env.SUPERSET_ADMIN_USERNAME || "admin";
-    const ADMIN_PASSWORD = process.env.SUPERSET_ADMIN_PASSWORD || "admin";
-
-    // A) Access Token
-    const loginBody = new FormData();
-    loginBody.append('username', ADMIN_USERNAME);
-    loginBody.append('password', ADMIN_PASSWORD);
-    loginBody.append('provider', 'db');
-    loginBody.append('refresh', 'true');
-
-    const loginResponse = await axios.post(`${SUPERSET_URL}/api/v1/security/login`, loginBody, {
-      headers: loginBody.getHeaders(),
-    });
-    const accessToken = loginResponse.data.access_token;
-
-    // B) Guest Token
-    const guestTokenResponse = await axios.post(
-      `${SUPERSET_URL}/api/v1/security/guest_token/`,
-      {
-        user: {
-          username: 'guest',
-          first_name: 'Invitado',
-          last_name: 'SoulArt',
-        },
-        resources: [{ type: 'dashboard', id: dashboardId }],
-        rls: [],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    res.json({ token: guestTokenResponse.data.token });
-
-  } catch (error) {
-    console.error('Error Supersert:', error.message);
-    res.status(500).json({ error: 'Error obteniendo token' });
-  }
-});
-
-// 3. SERVIR REACT
-app.use(express.static(path.join(__dirname, 'dist'))); 
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html')); 
-});
-
 // Puerto
 const PORT = 3001;
 app.listen(PORT, () => {
