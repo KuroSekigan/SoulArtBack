@@ -432,10 +432,10 @@ app.get('/comics/top-carrusel', (req, res) => {
             c.portada_url,
             c.autor_id,
 
-            COALESCE(v.vistas, 0) AS vistas,
+            c.vistas AS vistas,
             COALESCE(l.likes, 0) AS likes,
             COALESCE(d.dislikes, 0) AS dislikes,
-            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (COALESCE(v.vistas, 0) * 0.2)) AS score
+            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
         FROM comics c
         LEFT JOIN (
             SELECT id_comic, COUNT(*) AS likes
@@ -449,11 +449,6 @@ app.get('/comics/top-carrusel', (req, res) => {
             WHERE tipo = 'dislike'
             GROUP BY id_comic
         ) d ON d.id_comic = c.id
-        LEFT JOIN (
-            SELECT id_comic, COUNT(*) AS vistas
-            FROM vistas_comic
-            GROUP BY id_comic
-        ) v ON v.id_comic = c.id
         ORDER BY score DESC
         LIMIT 6;
     `;
