@@ -423,6 +423,50 @@ app.get('/usuario/:id/comics', (req, res) => {
     });
 });
 
+app.get('/comics/top-carrusel', (req, res) => {
+    const sql = `
+        SELECT 
+            c.id,
+            c.titulo,
+            c.descripcion,
+            c.portada_url,
+            c.autor_id,
+
+            COALESCE(v.vistas, 0) AS vistas,
+            COALESCE(l.likes, 0) AS likes,
+            COALESCE(d.dislikes, 0) AS dislikes,
+            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (COALESCE(v.vistas, 0) * 0.2)) AS score
+        FROM comics c
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS likes
+            FROM reacciones_comics
+            WHERE tipo = 'like'
+            GROUP BY id_comic
+        ) l ON l.id_comic = c.id
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS dislikes
+            FROM reacciones_comics
+            WHERE tipo = 'dislike'
+            GROUP BY id_comic
+        ) d ON d.id_comic = c.id
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS vistas
+            FROM vistas_comic
+            GROUP BY id_comic
+        ) v ON v.id_comic = c.id
+        ORDER BY score DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, result) => {
+        if (err) {
+            console.error("❌ Error al obtener cómics top:", err);
+            return res.status(500).json({ error: "Error al obtener cómics top" });
+        }
+        res.json(result);
+    });
+});
+
 // Obtener todos los cómics que estén en estado "publicado"
 app.get('/comics/publicados', (req, res) => {
     const { q, estado, tipo, generos } = req.query;
