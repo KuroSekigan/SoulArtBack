@@ -395,6 +395,68 @@ app.put('/usuario/:id', upload.single('foto_perfil'), (req, res) => {
     });
 });
 
+app.post('/reportar', verificarToken, (req, res) => {
+    const { tipo, id_objetivo, motivo } = req.body;
+    const id_usuario = req.user.id;
+
+    if (!tipo || !id_objetivo || !motivo) {
+        return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    const sql = `
+        INSERT INTO reportes (id_usuario, tipo, id_objetivo, motivo)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    db.query(sql, [id_usuario, tipo, id_objetivo, motivo], (err) => {
+        if (err) {
+            console.error("❌ Error al crear reporte:", err);
+            return res.status(500).json({ error: "Error al reportar" });
+        }
+
+        res.json({ success: true, message: "Reporte enviado" });
+    });
+});
+
+app.get('/comics/top-carrusel', (req, res) => {
+    const sql = `
+        SELECT 
+            c.id,
+            c.titulo,
+            c.descripcion,
+            c.portada_url,
+            c.autor_id,
+
+            c.vistas AS vistas,
+            COALESCE(l.likes, 0) AS likes,
+            COALESCE(d.dislikes, 0) AS dislikes,
+            (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
+        FROM comics c
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS likes
+            FROM reacciones_comics
+            WHERE tipo = 'like'
+            GROUP BY id_comic
+        ) l ON l.id_comic = c.id
+        LEFT JOIN (
+            SELECT id_comic, COUNT(*) AS dislikes
+            FROM reacciones_comics
+            WHERE tipo = 'dislike'
+            GROUP BY id_comic
+        ) d ON d.id_comic = c.id
+        ORDER BY score DESC
+        LIMIT 6;
+    `;
+
+    db.query(sql, (err, result) => {
+        if (err) {
+            console.error("❌ Error al obtener cómics top:", err);
+            return res.status(500).json({ error: "Error al obtener cómics top" });
+        }
+        res.json(result);
+    });
+});
+
 function verificarToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
