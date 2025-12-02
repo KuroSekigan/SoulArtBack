@@ -861,71 +861,68 @@ app.get('/capitulo/:id', (req, res) => {
 app.delete('/capitulo/:id', verificarToken, (req, res) => {
     const capituloId = req.params.id;
 
+    // Paso 0: Eliminar comentarios relacionados al capítulo
     const eliminarComentariosSql = 'DELETE FROM comentarios WHERE capitulo_id = ?';
 
     db.query(eliminarComentariosSql, [capituloId], (err) => {
         if (err) {
-            console.error('❌ Error al eliminar comentarios:', err);
+            console.error('❌ Error al eliminar comentarios del capítulo:', err);
             return res.status(500).json({ error: 'Error al eliminar comentarios' });
         }
 
-        // --- CONTINÚA tu lógica actual aquí ---
-        eliminarPaginasYGlobos();
-    });
+        // Paso 1: Obtener IDs de páginas
+        const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
 
-    // Paso 1: Obtener los IDs de las páginas del capítulo
-    const obtenerPaginasSql = 'SELECT id FROM paginas WHERE capitulo_id = ?';
-
-    db.query(obtenerPaginasSql, [capituloId], (err, paginas) => {
-        if (err) {
-            console.error('❌ Error al obtener páginas del capítulo:', err);
-            return res.status(500).json({ error: 'Error al obtener páginas' });
-        }
-
-        const paginaIds = paginas.map(p => p.id);
-
-        if (paginaIds.length === 0) {
-            // No hay páginas, eliminar solo el capítulo
-            eliminarCapitulo();
-            return;
-        }
-
-        // Paso 2: Eliminar globos_texto asociados a esas páginas
-        const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
-
-        db.query(eliminarGlobosSql, [paginaIds], (err) => {
+        db.query(obtenerPaginasSql, [capituloId], (err, paginas) => {
             if (err) {
-                console.error('❌ Error al eliminar globos de texto:', err);
-                return res.status(500).json({ error: 'Error al eliminar globos de texto' });
+                console.error('❌ Error al obtener páginas del capítulo:', err);
+                return res.status(500).json({ error: 'Error al obtener páginas' });
             }
 
-            // Paso 3: Eliminar las páginas
-            const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
+            const paginaIds = paginas.map(p => p.id);
 
-            db.query(eliminarPaginasSql, [capituloId], (err) => {
+            if (paginaIds.length === 0) {
+                eliminarCapitulo();
+                return;
+            }
+
+            // Paso 2: Eliminar globos de esas páginas
+            const eliminarGlobosSql = 'DELETE FROM globos_texto WHERE pagina_id IN (?)';
+
+            db.query(eliminarGlobosSql, [paginaIds], (err) => {
                 if (err) {
-                    console.error('❌ Error al eliminar páginas del capítulo:', err);
-                    return res.status(500).json({ error: 'Error al eliminar páginas' });
+                    console.error('❌ Error al eliminar globos de texto:', err);
+                    return res.status(500).json({ error: 'Error al eliminar globos de texto' });
                 }
 
-                // Paso 4: Eliminar el capítulo
-                eliminarCapitulo();
+                // Paso 3: Eliminar páginas
+                const eliminarPaginasSql = 'DELETE FROM paginas WHERE capitulo_id = ?';
+
+                db.query(eliminarPaginasSql, [capituloId], (err) => {
+                    if (err) {
+                        console.error('❌ Error al eliminar páginas del capítulo:', err);
+                        return res.status(500).json({ error: 'Error al eliminar páginas' });
+                    }
+
+                    // Paso 4: Eliminar el capítulo
+                    eliminarCapitulo();
+                });
             });
         });
+
+        function eliminarCapitulo() {
+            const eliminarCapituloSql = 'DELETE FROM capitulos WHERE id = ?';
+
+            db.query(eliminarCapituloSql, [capituloId], (err) => {
+                if (err) {
+                    console.error('❌ Error al eliminar capítulo:', err);
+                    return res.status(500).json({ error: 'Error al eliminar capítulo' });
+                }
+
+                res.json({ success: true, message: 'Capítulo, páginas, globos y comentarios eliminados correctamente' });
+            });
+        }
     });
-
-    function eliminarCapitulo() {
-        const eliminarCapituloSql = 'DELETE FROM capitulos WHERE id = ?';
-
-        db.query(eliminarCapituloSql, [capituloId], (err) => {
-            if (err) {
-                console.error('❌ Error al eliminar capítulo:', err);
-                return res.status(500).json({ error: 'Error al eliminar capítulo' });
-            }
-
-            res.json({ success: true, message: 'Capítulo, páginas y globos eliminados correctamente' });
-        });
-    }
 });
 
 app.put('/capitulo/:id', verificarToken, uploadPaginas.array('imagenes'), (req, res) => {
