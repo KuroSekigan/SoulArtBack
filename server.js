@@ -540,28 +540,33 @@ app.get('/comics/publicados', (req, res) => {
 // Obtener comics con publicacion = "solicitud"
 app.get("/comics/solicitud", async (req, res) => {
   try {
-    const [rows] = await db.query(
-      "SELECT * FROM comics WHERE publicacion = 'solicitud'"
+    const [rows] = await db.promise().query(
+      `SELECT c.id, c.titulo, c.autor_id, u.nombre_usuario AS autor
+       FROM comics c
+       JOIN usuarios u ON c.autor_id = u.id
+       WHERE c.publicacion = 'solicitud'`
     );
+
     res.json(rows);
   } catch (err) {
-    console.error("Error al obtener comics en solicitud:", err);
-    res.status(500).json({ error: "Error al obtener comics en solicitud" });
+    console.error("❌ Error al obtener comics en solicitud:", err);
+    res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
 // Cambiar estado de solicitud a publicado
 app.put("/comics/:id/publicar", async (req, res) => {
-  const { id } = req.params;
-
   try {
-    await db.query(
+    const { id } = req.params;
+
+    await db.promise().query(
       "UPDATE comics SET publicacion = 'publicado' WHERE id = ?",
       [id]
     );
+
     res.json({ message: "Comic publicado correctamente" });
   } catch (err) {
-    console.error("Error al publicar comic:", err);
+    console.error("❌ Error al publicar comic:", err);
     res.status(500).json({ error: "Error al publicar comic" });
   }
 });
