@@ -444,6 +444,7 @@ app.get('/comics/top-carrusel', (req, res) => {
             WHERE tipo = 'dislike'
             GROUP BY id_comic
         ) d ON d.id_comic = c.id
+        WHERE c.publicacion = 'publicado'
         ORDER BY score DESC
         LIMIT 6;
     `;
