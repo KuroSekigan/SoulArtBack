@@ -432,6 +432,7 @@ app.get('/comics/top-carrusel', (req, res) => {
             COALESCE(d.dislikes, 0) AS dislikes,
             (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
         FROM comics c
+        WHERE publicacion = 'publicado'
         LEFT JOIN (
             SELECT id_comic, COUNT(*) AS likes
             FROM reacciones_comics
@@ -518,7 +519,7 @@ app.get('/comics/publicados', (req, res) => {
 
     // 🟩 FILTRO DE GÉNERO
     if (generos) {
-        sql += ` AND comics.generos = ?`;
+        sql += ` AND FIND_IN_SET(?, comics.generos)`;
         params.push(generos);
     }
 
