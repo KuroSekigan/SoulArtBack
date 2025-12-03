@@ -537,6 +537,35 @@ app.get('/comics/publicados', (req, res) => {
     });
 });
 
+// Obtener comics con publicacion = "solicitud"
+app.get("/comics/solicitud", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM comics WHERE publicacion = 'solicitud'"
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error al obtener comics en solicitud:", err);
+    res.status(500).json({ error: "Error al obtener comics en solicitud" });
+  }
+});
+
+// Cambiar estado de solicitud a publicado
+app.put("/comics/:id/publicar", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await db.query(
+      "UPDATE comics SET publicacion = 'publicado' WHERE id = ?",
+      [id]
+    );
+    res.json({ message: "Comic publicado correctamente" });
+  } catch (err) {
+    console.error("Error al publicar comic:", err);
+    res.status(500).json({ error: "Error al publicar comic" });
+  }
+});
+
 // OBRAS MÁS GUSTADAS
 app.get('/comics/mas-gustados', (req, res) => {
     const sql = `
