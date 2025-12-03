@@ -930,9 +930,6 @@ app.delete('/capitulo/:id', verificarToken, (req, res) => {
             console.error('❌ Error al eliminar comentarios:', err);
             return res.status(500).json({ error: 'Error al eliminar comentarios' });
         }
-
-        // --- CONTINÚA tu lógica actual aquí ---
-        eliminarPaginasYGlobos();
     });
 
     // Paso 1: Obtener los IDs de las páginas del capítulo
