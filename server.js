@@ -432,7 +432,6 @@ app.get('/comics/top-carrusel', (req, res) => {
             COALESCE(d.dislikes, 0) AS dislikes,
             (COALESCE(l.likes, 0) - COALESCE(d.dislikes, 0) + (c.vistas * 0.2)) AS score
         FROM comics c
-        WHERE publicacion = 'publicado'
         LEFT JOIN (
             SELECT id_comic, COUNT(*) AS likes
             FROM reacciones_comics
